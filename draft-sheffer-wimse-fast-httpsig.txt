@@ -316,10 +316,11 @@ Table of Contents
 8.  Tickets
 
    Tickets are optional per session and issuer-specific. wimse-session-
-   id identifies the session; see Section 6 and Section 5.  A peer that
-   keeps session keys in local (or shared) state keyed by session_id MAY
-   omit its ticket.  A ticket is useful when a replica of that issuer
-   must recover session keys without that shared state.
+   id identifies the session on the wire in Section 6; its value is
+   computed in Section 5.  A peer that keeps session keys in local (or
+   shared) state keyed by session_id MAY omit its ticket.  A ticket is
+   useful when a replica of that issuer must recover session keys
+   without that shared state.
 
    This document defines two signature parameters, each an opaque Byte
    Sequence:
@@ -331,7 +332,7 @@ Table of Contents
       deployment opens it.
 
    Issuance happens only after the issuer can populate the ticket with
-   derived session material; see Section 5 and Section 7:
+   the derived MAC keys (Section 5) and session_exp (Section 7):
 
    *  The server MAY include wimse-ticket-server on the handshake
       response.

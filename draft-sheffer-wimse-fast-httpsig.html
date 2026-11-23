@@ -1503,7 +1503,8 @@ Each session has its own <code>session_id</code>, key material, and, when issued
 <a href="#section-8" class="section-number selfRef">8. </a><a href="#name-tickets" class="section-name selfRef">Tickets</a>
       </h2>
 <p id="section-8-1">Tickets are optional per session and issuer-specific.
-<code>wimse-session-id</code> identifies the session; see <a href="#session" class="auto internal xref">Section 6</a> and <a href="#key-derivation" class="auto internal xref">Section 5</a>.
+<code>wimse-session-id</code> identifies the session on the wire in <a href="#session" class="auto internal xref">Section 6</a>;
+its value is computed in <a href="#key-derivation" class="auto internal xref">Section 5</a>.
 A peer that keeps session keys in local (or shared) state keyed by <code>session_id</code>
         <span class="bcp14">MAY</span> omit its ticket.
 A ticket is useful when a replica of that issuer must recover session keys without that
@@ -1517,8 +1518,8 @@ shared state.<a href="#section-8-1" class="pilcrow">¶</a></p>
           <p id="section-8-3.2.1"><code>wimse-ticket-server</code>: issued by the server; only the server deployment opens it.<a href="#section-8-3.2.1" class="pilcrow">¶</a></p>
 </li>
       </ul>
-<p id="section-8-4">Issuance happens only after the issuer can populate the ticket with derived session
-material; see <a href="#key-derivation" class="auto internal xref">Section 5</a> and <a href="#lifetime" class="auto internal xref">Section 7</a>:<a href="#section-8-4" class="pilcrow">¶</a></p>
+<p id="section-8-4">Issuance happens only after the issuer can populate the ticket with the derived
+MAC keys (<a href="#key-derivation" class="auto internal xref">Section 5</a>) and <code>session_exp</code> (<a href="#lifetime" class="auto internal xref">Section 7</a>):<a href="#section-8-4" class="pilcrow">¶</a></p>
 <ul class="normal">
 <li class="normal" id="section-8-5.1">
           <p id="section-8-5.1.1">The server <span class="bcp14">MAY</span> include <code>wimse-ticket-server</code> on the handshake response.<a href="#section-8-5.1.1" class="pilcrow">¶</a></p>
