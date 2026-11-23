@@ -28,6 +28,10 @@ author:
     fullname: "Yaron Sheffer"
     organization: Independent
     email: "yaronf.ietf@gmail.com"
+ -
+    fullname: "Joe Salowey"
+    organization: "Palo Alto Networks"
+    email: "joe@salowey.net"
 
 informative:
   IANA.HTTP.MESSAGE.SIGNATURE:
