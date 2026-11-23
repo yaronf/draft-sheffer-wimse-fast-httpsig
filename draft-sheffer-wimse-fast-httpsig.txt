@@ -4,8 +4,9 @@
 
 Workload Identity in Multi System Environments                Y. Sheffer
 Internet-Draft                                               Independent
-Intended status: Standards Track                        17 November 2026
-Expires: 21 May 2027
+Intended status: Standards Track                              J. Salowey
+Expires: 27 May 2027                                  Palo Alto Networks
+                                                        23 November 2026
 
 
                  Fast HTTP Message Signatures for WIMSE
@@ -55,7 +56,7 @@ Status of This Memo
    time.  It is inappropriate to use Internet-Drafts as reference
    material or to cite them other than as "work in progress."
 
-   This Internet-Draft will expire on 21 May 2027.
+   This Internet-Draft will expire on 27 May 2027.
 
 Copyright Notice
 
@@ -99,7 +100,7 @@ Table of Contents
    Appendix A.  Document History
      A.1.  draft-sheffer-wimse-fast-httpsig-00
    Acknowledgments
-   Author's Address
+   Authors' Addresses
 
 1.  Introduction
 
@@ -605,9 +606,9 @@ Table of Contents
    [I-D.ietf-wimse-http-signature]
               Salowey, J. A. and Y. Sheffer, "WIMSE Workload-to-Workload
               Authentication with HTTP Signatures", Work in Progress,
-              Internet-Draft, draft-ietf-wimse-http-signature-08, 20
-              October 2026, <https://datatracker.ietf.org/doc/html/
-              draft-ietf-wimse-http-signature-08>.
+              Internet-Draft, draft-ietf-wimse-http-signature-09, 20
+              November 2026, <https://datatracker.ietf.org/doc/html/
+              draft-ietf-wimse-http-signature-09>.
 
    [I-D.ietf-wimse-workload-creds]
               Campbell, B., Salowey, J. A., Schwenkschuster, A.,
@@ -672,8 +673,13 @@ Acknowledgments
 
    TODO.
 
-Author's Address
+Authors' Addresses
 
    Yaron Sheffer
    Independent
    Email: yaronf.ietf@gmail.com
+
+
+   Joe Salowey
+   Palo Alto Networks
+   Email: joe@salowey.net
