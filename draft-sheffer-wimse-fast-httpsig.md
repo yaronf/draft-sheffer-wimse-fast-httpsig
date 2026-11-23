@@ -241,7 +241,8 @@ Each session has its own `session_id`, key material, and, when issued, its own t
 # Tickets {#ticket}
 
 Tickets are optional per session and issuer-specific.
-`wimse-session-id` identifies the session; see {{session}} and {{key-derivation}}.
+`wimse-session-id` identifies the session on the wire in {{session}};
+its value is computed in {{key-derivation}}.
 A peer that keeps session keys in local (or shared) state keyed by `session_id`
 MAY omit its ticket.
 A ticket is useful when a replica of that issuer must recover session keys without that
@@ -252,8 +253,8 @@ This document defines two signature parameters, each an opaque Byte Sequence:
 * `wimse-ticket-client`: issued by the client; only the client deployment opens it.
 * `wimse-ticket-server`: issued by the server; only the server deployment opens it.
 
-Issuance happens only after the issuer can populate the ticket with derived session
-material; see {{key-derivation}} and {{lifetime}}:
+Issuance happens only after the issuer can populate the ticket with the derived
+MAC keys ({{key-derivation}}) and `session_exp` ({{lifetime}}):
 
 * The server MAY include `wimse-ticket-server` on the handshake response.
 * The client MUST NOT include `wimse-ticket-client` on the handshake request.
