@@ -1,6 +1,6 @@
 {
   "magic": "E!vIA5L86J2I",
-  "timestamp": "2026-11-22T04:18:06.692133+00:00",
+  "timestamp": "2026-11-24T07:44:37.186678+00:00",
   "repo": "yaronf/draft-sheffer-wimse-fast-httpsig",
   "labels": [
     {
@@ -54,6 +54,113 @@
       "color": "ffffff"
     }
   ],
-  "issues": [],
-  "pulls": []
+  "issues": [
+    {
+      "number": 2,
+      "id": "I_kwDOVv8bsc8AAAABhm4HJw",
+      "title": "Consider a PQ KEM default",
+      "url": "https://github.com/yaronf/draft-sheffer-wimse-fast-httpsig/issues/2",
+      "state": "OPEN",
+      "author": "jsalowey",
+      "authorAssociation": "COLLABORATOR",
+      "assignees": [],
+      "labels": [],
+      "body": "Consider a PQ KEM default.  While it is likely that this is encapsulated in several TLS sessions that can provide PQ protection it is still exposed in an intermediary.  It is perhaps less critical for now since the protection is integrity only, one of the motivations for deploying this is the cost of PQ. ",
+      "createdAt": "2026-11-23T01:20:34Z",
+      "updatedAt": "2026-11-23T16:13:59Z",
+      "closedAt": null,
+      "comments": [
+        {
+          "author": "yaronf",
+          "authorAssociation": "OWNER",
+          "body": "I'm not sure what you mean:\n\n1. The main default of the draft should be PQ.\n2. Specify a PQ default alg in parallel to a classical one.\n\nI'm not very supportive of option 1. I may be behind the times, but I think for real-life deployments in a service backend today, a PQ-only draft would not be acceptable. I do realize it takes 2 years to publish an RFC though.\n\nFor option 2, we could have the selected HPKE ciphersuite depend deterministically on the main http-sig algorithm.",
+          "createdAt": "2026-11-23T05:19:12Z",
+          "updatedAt": "2026-11-23T05:19:12Z"
+        },
+        {
+          "author": "jsalowey",
+          "authorAssociation": "COLLABORATOR",
+          "body": "Good Question, I think 2 is fine, and I like the idea of selecting the KEM based on the main http-sig algorith.",
+          "createdAt": "2026-11-23T16:13:59Z",
+          "updatedAt": "2026-11-23T16:13:59Z"
+        }
+      ]
+    },
+    {
+      "number": 3,
+      "id": "I_kwDOVv8bsc8AAAABhm-2Nw",
+      "title": "Define messages in terms of HPKE building blocks instead of DHKEM primitives",
+      "url": "https://github.com/yaronf/draft-sheffer-wimse-fast-httpsig/issues/3",
+      "state": "OPEN",
+      "author": "jsalowey",
+      "authorAssociation": "COLLABORATOR",
+      "assignees": [],
+      "labels": [],
+      "body": "The draft is very tied to DHKEM primitives.  IT should up level to describe in terms of HPKE interfaces. ",
+      "createdAt": "2026-11-23T01:31:39Z",
+      "updatedAt": "2026-11-23T01:31:39Z",
+      "closedAt": null,
+      "comments": []
+    },
+    {
+      "number": 4,
+      "id": "I_kwDOVv8bsc8AAAABhnFj2Q",
+      "title": "Use HPKE exporters",
+      "url": "https://github.com/yaronf/draft-sheffer-wimse-fast-httpsig/issues/4",
+      "state": "OPEN",
+      "author": "jsalowey",
+      "authorAssociation": "COLLABORATOR",
+      "assignees": [],
+      "labels": [],
+      "body": "The draft is slicing up HPKE and just seems to use the KEM portion.  It would provide a cleaner interface and more modularity if you use exporter instead. Section 5.3 of draft-ietf-hpke-hpke.  Then we will not have to define a key derivation in this document and an HPKE KDF can be used. \n",
+      "createdAt": "2026-11-23T01:42:12Z",
+      "updatedAt": "2026-11-23T01:42:12Z",
+      "closedAt": null,
+      "comments": []
+    }
+  ],
+  "pulls": [
+    {
+      "number": 1,
+      "id": "PR_kwDOVv8bsc8AAAABRJDI4Q",
+      "title": "Add Joe Salowey's contact information",
+      "url": "https://github.com/yaronf/draft-sheffer-wimse-fast-httpsig/pull/1",
+      "state": "MERGED",
+      "author": "jsalowey",
+      "authorAssociation": "COLLABORATOR",
+      "assignees": [],
+      "labels": [],
+      "body": "add Joe",
+      "createdAt": "2026-11-23T01:00:55Z",
+      "updatedAt": "2026-11-23T04:49:23Z",
+      "baseRepository": "yaronf/draft-sheffer-wimse-fast-httpsig",
+      "baseRefName": "main",
+      "baseRefOid": "bbfaf84adf309679eeb34e50b4a0dc67df4252a2",
+      "headRepository": "jsalowey/draft-sheffer-wimse-fast-httpsig",
+      "headRefName": "patch-1",
+      "headRefOid": "3deb37b7a3f0e30ed2fbbe9d0aaaee3a05e27616",
+      "closedAt": "2026-11-23T04:49:23Z",
+      "mergedAt": "2026-11-23T04:49:23Z",
+      "mergedBy": "yaronf",
+      "mergeCommit": {
+        "oid": "c85a887798a4a366c596ed4f15a99e67b7af27f1"
+      },
+      "comments": [],
+      "reviews": [
+        {
+          "id": "PRR_kwDOVv8bsc8AAAABZp-s4A",
+          "commit": {
+            "abbreviatedOid": "3deb37b"
+          },
+          "author": "yaronf",
+          "authorAssociation": "OWNER",
+          "state": "APPROVED",
+          "body": "",
+          "createdAt": "2026-11-23T04:49:07Z",
+          "updatedAt": "2026-11-23T04:49:07Z",
+          "comments": []
+        }
+      ]
+    }
+  ]
 }
