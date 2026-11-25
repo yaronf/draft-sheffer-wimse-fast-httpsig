@@ -1,6 +1,6 @@
 GET /gimme-ice-cream?flavor=vanilla HTTP/1.1
 Host: svcb.example.com
-Signature: sig1=:p7oS3Td9gTinkj4XCJDCz7M7aMOD4+aRLMeUeDoiY2ZkSb+VHA/wawG/zlTr5YiHRq/ekyxeERP8eUH+5HydBA==:
-Signature-Input: sig1=("@method" "@path" "@query" "workload-identity-token");created=1794941027;expires=1794941327;nonce="fast1111";tag="wimse-workload-to-workload";wimse-aud="https://svcb.example.com/gimme-ice-cream";wimse-sign-response;wimse-kem-suite="dhkem-p256-hkdf-sha256";wimse-kem=:BLLf3h1WNjsWaRioviU0O99RizytP1LkIDREgPMHR7YSgZVlHLjv/QEPNHyEZHbnUKumy75h1rpl/KK4lWrewrk=:
-Workload-Identity-Token: eyJhbGciOiJFZDI1NTE5...2tNmrxF3IXCQ
+Signature: sig1=:JOn518Mhsejiz1cPgRTeZKBh9Bxz8sBCcgOFSsuVdP9HGhzMhXcULvQKLibB1KWH8CzlDyjEcY7bT6ahzv8CDw==:
+Signature-Input: sig1=("@method" "@path" "@query" "workload-identity-token");created=1795603147;expires=1795603447;nonce="fast1111";tag="wimse-workload-to-workload";wimse-aud="https://svcb.example.com/gimme-ice-cream";wimse-sign-response;wimse-kem-suite=:ABAAAf//:;wimse-kem=:BNng0D1r4QDiAWMpfBv/eke12bfkhBfxm9BRPu92AMgO97ZA4/kP+bvRMvxraSf/dTuymVSnpKN5ji6UMe3QnSg=:
+Workload-Identity-Token: eyJhbGciOiJFZDI1NTE5...-B1ORziWHAAw
 

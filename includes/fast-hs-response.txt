@@ -2,8 +2,8 @@ HTTP/1.1 404 Not Found
 Content-Length: 20
 Content-Digest: sha-256=:uJC3qmCc7n6/6w4N2I0vAfj1cd/hTOAhxLEYXmPbNno=:
 Content-Type: text/plain
-Signature: sig1=:55FpeyDgpPR9ph2b2jRxyszuQMArVOqScllpf6HkTxREmA4LUegGxDbPm1NqMGuEzrrxsZ7q5IZqyoCw6JIlCQ==:
-Signature-Input: sig1=("@status" "workload-identity-token" "content-type" "content-digest" "@method";req "@path";req "@query";req);created=1794941027;expires=1794941329;nonce="fast2222";tag="wimse-workload-to-workload";wimse-req-nonce="fast1111";wimse-kem-suite="dhkem-p256-hkdf-sha256";wimse-kem=:BDrUPCnWqLE+8/98HiKD77vwZ9ZcAi6VgMcLwwoMkA1ClhYvE4EAfK5sBeUe5t57gzhhow049rnqeG6z4NGaKU8=:;wimse-ticket-server=:dGlja2V0...GxwdHg==:
-Workload-Identity-Token: eyJhbGciOiJFZDI1NTE5...i9i7E0U1OPBg
+Signature: sig1=:hnHaKv7YNbiYEfMu2VwE2T6371K+Vi7FUmnnj/e5dbhPradNcv7ybQRCppmS1wZrom6lCWzWmfUV3t9RXbWKAA==:
+Signature-Input: sig1=("@status" "workload-identity-token" "content-type" "content-digest" "@method";req "@path";req "@query";req);created=1795603147;expires=1795603449;nonce="fast2222";tag="wimse-workload-to-workload";wimse-req-nonce="fast1111";wimse-kem-suite=:ABAAAf//:;wimse-kem=:BHkeeUK2/Sg60GbqQ7oXriDu85CR49sYkPqRH7F+s4tTDruB0H648/hRabnMqVt9x2tPCa1R7/ktrmh3Ck4T3SM=:;wimse-ticket-server=:dGlja2V0...GxwdHg==:
+Workload-Identity-Token: eyJhbGciOiJFZDI1NTE5...EaAJDeFQ75CA
 
 No ice cream today.
