@@ -59,7 +59,7 @@ Asymmetric verification is secondary to that byte and parsing cost.
 
 This document defines an optional extension of that profile.
 The peers run one WIT-authenticated request/response exchange that also
-performs an ephemeral key agreement.
+performs an ephemeral key establishment.
 Later messages in the same session are authenticated with HTTP Message Signatures
 {{!RFC9421}} using `hmac-sha256` and an HPKE-exported session identifier,
 optionally with compact tickets.
@@ -67,7 +67,8 @@ The WIT is omitted from those messages.
 
 Goals:
 
-* Amortize WIT carriage over many calls between the same workloads.
+* Amortize WIT carriage and asymmetric signature and verification over many
+  calls between the same workloads.
 * Extend the base profile; remain verifiable across TLS-terminating intermediaries, as in the base profile.
 * Keep the wire format open to a future post-quantum KEM without a redesign.
 
@@ -83,10 +84,10 @@ Terminology follows {{?I-D.ietf-wimse-arch}} and {{I-D.ietf-wimse-http-signature
 
 A session begins with one handshake request and its handshake response,
 both signed under the base profile.
-The peers run HPKE {{!RFC9180}} in Base mode with the Export interface only
-(no `Seal` / `Open`): the client is the HPKE recipient and sends an ephemeral
-recipient public key; the server is the HPKE sender and returns the encapsulated
-key `enc`. Both values are opaque `wimse-kem` byte sequences.
+The peers run HPKE {{!RFC9180}} in Base mode and use only the Export interface:
+the client is the HPKE recipient and sends an ephemeral recipient public key;
+the server is the HPKE sender and returns the encapsulated key `enc`.
+Both values are opaque `wimse-kem` byte sequences.
 Both sides export two MAC keys (one per direction) and a session identifier from
 the HPKE context.
 The server MAY issue an opaque ticket on the handshake response.
@@ -106,12 +107,11 @@ including WIT validation and the `wimse-workload-to-workload` tag.
 The handshake response MUST be signed.
 Clients that require this extension MUST include `wimse-sign-response` on the handshake request.
 
-## Key Agreement
+## Key Establishment
 
 The handshake uses HPKE {{!RFC9180}} in Base mode
 ({{Section 5.1.1 of RFC9180}}) and obtains session secrets only through the Export
 interface ({{Section 5.3 of RFC9180}}).
-Peers MUST NOT use HPKE `Seal` or `Open` for this extension.
 
 An HPKE ciphersuite is the triple `(kem_id, kdf_id, aead_id)` of two-octet identifiers
 from {{RFC9180}}.
@@ -143,8 +143,7 @@ where:
 * `req_nonce` / `resp_nonce` are the parsed handshake `nonce` values
   ({{Section 2.3 of RFC9421}}) as UTF-8 octets and without the surrounding quotes.
 * `client_WIT` / `server_WIT` are the handshake request and response
-  `Workload-Identity-Token` header field values (compact JWS serialization),
-  as ASCII octets.
+  `Workload-Identity-Token` header field values (JWTs), as ASCII octets.
 * `SHA-256(...)` denotes the 32-octet SHA-256 hash of those octets.
 
 The server constructs `info` when creating the handshake response (it chooses
@@ -188,7 +187,8 @@ It MUST NOT be used as an HPKE recipient key.
 
 # Key Export {#key-derivation}
 
-Both sides export 80 octets from the HPKE context established in {{handshake}}:
+Both sides export MAC keys and a session identifier from the HPKE context
+established in {{handshake}}:
 
 ~~~
 OKM = Context.Export("session-keys", 80)
@@ -312,8 +312,7 @@ The following content is RECOMMENDED inside the protected ticket material:
 * `k_req` and `k_res` (or equivalent key material),
 * client and server `sub` values,
 * `wimse-aud`,
-* `session_exp`,
-* HPKE ciphersuite identifiers (`kem_id`, `kdf_id`, `aead_id`).
+* `session_exp`.
 
 A recipient that uses a ticket to obtain keys MUST reject it if the ticket cannot be
 decoded or authenticated under current local policy.
