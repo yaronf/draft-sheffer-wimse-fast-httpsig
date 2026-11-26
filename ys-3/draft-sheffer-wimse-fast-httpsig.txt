@@ -5,8 +5,8 @@
 Workload Identity in Multi System Environments                Y. Sheffer
 Internet-Draft                                               Independent
 Intended status: Standards Track                              J. Salowey
-Expires: 29 May 2027                                  Palo Alto Networks
-                                                        25 November 2026
+Expires: 30 May 2027                                  Palo Alto Networks
+                                                        26 November 2026
 
 
                  Fast HTTP Message Signatures for WIMSE
@@ -56,7 +56,7 @@ Status of This Memo
    time.  It is inappropriate to use Internet-Drafts as reference
    material or to cite them other than as "work in progress."
 
-   This Internet-Draft will expire on 29 May 2027.
+   This Internet-Draft will expire on 30 May 2027.
 
 Copyright Notice
 
@@ -78,7 +78,7 @@ Table of Contents
    2.  Conventions and Definitions
    3.  Overview
    4.  Handshake
-     4.1.  Key Agreement
+     4.1.  Key Establishment
    5.  Key Export
    6.  Session Messages
    7.  Session Lifetime
@@ -112,14 +112,15 @@ Table of Contents
 
    This document defines an optional extension of that profile.  The
    peers run one WIT-authenticated request/response exchange that also
-   performs an ephemeral key agreement.  Later messages in the same
+   performs an ephemeral key establishment.  Later messages in the same
    session are authenticated with HTTP Message Signatures [RFC9421]
    using hmac-sha256 and an HPKE-exported session identifier, optionally
    with compact tickets.  The WIT is omitted from those messages.
 
    Goals:
 
-   *  Amortize WIT carriage over many calls between the same workloads.
+   *  Amortize WIT carriage and asymmetric signature and verification
+      over many calls between the same workloads.
 
    *  Extend the base profile; remain verifiable across TLS-terminating
       intermediaries, as in the base profile.
@@ -142,21 +143,21 @@ Table of Contents
 
    A session begins with one handshake request and its handshake
    response, both signed under the base profile.  The peers run HPKE
-   [RFC9180] in Base mode with the Export interface only (no Seal /
-   Open): the client is the HPKE recipient and sends an ephemeral
-   recipient public key; the server is the HPKE sender and returns the
-   encapsulated key enc.  Both values are opaque wimse-kem byte
-   sequences.  Both sides export two MAC keys (one per direction) and a
-   session identifier from the HPKE context.  The server MAY issue an
-   opaque ticket on the handshake response.  The client MAY issue an
-   opaque ticket on its first session request, after key export; see
-   Section 8.  The client confirms possession of the exported keys by
-   MACing its next request.  Further requests and responses use hmac-
-   sha256 and carry the session identifier; when tickets were issued,
-   they carry those ticket parameters as well.  There is no session
-   rehandshake: when the session ends, the peers start a new handshake.
-   A pair of workloads MAY hold concurrent sessions; the session
-   identifier distinguishes them.
+   [RFC9180] in Base mode and use only the Export interface: the client
+   is the HPKE recipient and sends an ephemeral recipient public key;
+   the server is the HPKE sender and returns the encapsulated key enc.
+   Both values are opaque wimse-kem byte sequences.  Both sides export
+   two MAC keys (one per direction) and a session identifier from the
+   HPKE context.  The server MAY issue an opaque ticket on the handshake
+   response.  The client MAY issue an opaque ticket on its first session
+   request, after key export; see Section 8.  The client confirms
+   possession of the exported keys by MACing its next request.  Further
+   requests and responses use hmac-sha256 and carry the session
+   identifier; when tickets were issued, they carry those ticket
+   parameters as well.  There is no session rehandshake: when the
+   session ends, the peers start a new handshake.  A pair of workloads
+   MAY hold concurrent sessions; the session identifier distinguishes
+   them.
 
 4.  Handshake
 
@@ -166,12 +167,11 @@ Table of Contents
    signed.  Clients that require this extension MUST include wimse-sign-
    response on the handshake request.
 
-4.1.  Key Agreement
+4.1.  Key Establishment
 
    The handshake uses HPKE [RFC9180] in Base mode (Section 5.1.1 of
    [RFC9180]) and obtains session secrets only through the Export
-   interface (Section 5.3 of [RFC9180]).  Peers MUST NOT use HPKE Seal
-   or Open for this extension.
+   interface (Section 5.3 of [RFC9180]).
 
    An HPKE ciphersuite is the triple (kem_id, kdf_id, aead_id) of two-
    octet identifiers from [RFC9180].  The mandatory ciphersuite is:
@@ -205,8 +205,8 @@ Table of Contents
       surrounding quotes.
 
    *  client_WIT / server_WIT are the handshake request and response
-      Workload-Identity-Token header field values (compact JWS
-      serialization), as ASCII octets.
+      Workload-Identity-Token header field values (JWTs), as ASCII
+      octets.
 
    *  SHA-256(...) denotes the 32-octet SHA-256 hash of those octets.
 
@@ -260,8 +260,8 @@ Table of Contents
 
 5.  Key Export
 
-   Both sides export 80 octets from the HPKE context established in
-   Section 4:
+   Both sides export MAC keys and a session identifier from the HPKE
+   context established in Section 4:
 
    OKM = Context.Export("session-keys", 80)
    k_req = OKM[0..31]
@@ -411,9 +411,7 @@ Table of Contents
 
    *  wimse-aud,
 
-   *  session_exp,
-
-   *  HPKE ciphersuite identifiers (kem_id, kdf_id, aead_id).
+   *  session_exp.
 
    A recipient that uses a ticket to obtain keys MUST reject it if the
    ticket cannot be decoded or authenticated under current local policy.
