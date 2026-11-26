@@ -5,11 +5,11 @@ Content-Length: 20
 Content-Digest: sha-256=:uJC3qmCc7n6/6w4N2I0vAfj1cd/hTOAhxLEYXmPbNno\
 =:
 Content-Type: text/plain
-Signature: sig1=:b8mYcKatqaRfb225bJBKDBw8/vzEiEVO9wuYov+hJzk=:
+Signature: sig1=:Lu1VoaYruP5CIyRR+RQmoBrxBKULTQINw6JrWGoJksA=:
 Signature-Input: sig1=("@status" "content-type" "content-digest" "@m\
-ethod";req "@path";req "@query";req);created=1794941027;expires=1794\
-941327;nonce="fast4444";alg="hmac-sha256";tag="wimse-httpsig-session\
-";wimse-req-nonce="fast3333";wimse-session-id=:eGohVfXyyecoTaWunpim4\
+ethod";req "@path";req "@query";req);created=1795603147;expires=1795\
+603447;nonce="fast4444";alg="hmac-sha256";tag="wimse-httpsig-session\
+";wimse-req-nonce="fast3333";wimse-session-id=:C1rrnxDm3kFUpk7AKgeNB\
 Q==:;wimse-ticket-server=:dGlja2V0...GxwdHg==:;wimse-ticket-client=:\
 dGlja2V0...SktMTU4=:
 

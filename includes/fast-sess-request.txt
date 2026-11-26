@@ -1,5 +1,5 @@
 GET /gimme-ice-cream?flavor=vanilla HTTP/1.1
 Host: svcb.example.com
-Signature: sig1=:6UrEyIkdSu3mGefzuiP7ew1mhNWMSsWiKh/7BTXz5AM=:
-Signature-Input: sig1=("@method" "@path" "@query");created=1794941027;expires=1794941327;nonce="fast3333";alg="hmac-sha256";tag="wimse-httpsig-session";wimse-aud="https://svcb.example.com/gimme-ice-cream";wimse-sign-response;wimse-session-id=:eGohVfXyyecoTaWunpim4Q==:;wimse-ticket-server=:dGlja2V0...GxwdHg==:;wimse-ticket-client=:dGlja2V0...SktMTU4=:
+Signature: sig1=:BOzmD0gP96FOq1+qdZrAi5kurV5qXIzcvURse1G6DN4=:
+Signature-Input: sig1=("@method" "@path" "@query");created=1795603147;expires=1795603447;nonce="fast3333";alg="hmac-sha256";tag="wimse-httpsig-session";wimse-aud="https://svcb.example.com/gimme-ice-cream";wimse-sign-response;wimse-session-id=:C1rrnxDm3kFUpk7AKgeNBQ==:;wimse-ticket-server=:dGlja2V0...GxwdHg==:;wimse-ticket-client=:dGlja2V0...SktMTU4=:
 

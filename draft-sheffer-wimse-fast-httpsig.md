@@ -37,12 +37,6 @@ informative:
   IANA.HTTP.MESSAGE.SIGNATURE:
     title: "HTTP Message Signature"
     target: https://www.iana.org/assignments/http-message-signature/http-message-signature.xhtml#signature-metadata-parameters
-  SECG1:
-    title: "SEC 1: Elliptic Curve Cryptography"
-    target: https://www.secg.org/sec1-v2.pdf
-    author:
-      - org: Standards for Efficient Cryptography Group
-    date: 2009
 
 --- abstract
 
@@ -65,15 +59,16 @@ Asymmetric verification is secondary to that byte and parsing cost.
 
 This document defines an optional extension of that profile.
 The peers run one WIT-authenticated request/response exchange that also
-performs an ephemeral key agreement.
+performs an ephemeral key establishment.
 Later messages in the same session are authenticated with HTTP Message Signatures
-{{!RFC9421}} using `hmac-sha256` and a transcript-derived session identifier,
+{{!RFC9421}} using `hmac-sha256` and an HPKE-exported session identifier,
 optionally with compact tickets.
 The WIT is omitted from those messages.
 
 Goals:
 
-* Amortize WIT carriage over many calls between the same workloads.
+* Amortize WIT carriage and asymmetric signature and verification over many
+  calls between the same workloads.
 * Extend the base profile; remain verifiable across TLS-terminating intermediaries, as in the base profile.
 * Keep the wire format open to a future post-quantum KEM without a redesign.
 
@@ -89,14 +84,16 @@ Terminology follows {{?I-D.ietf-wimse-arch}} and {{I-D.ietf-wimse-http-signature
 
 A session begins with one handshake request and its handshake response,
 both signed under the base profile.
-The peers run an ephemeral HPKE DHKEM {{!RFC9180}}: the client sends a fresh KEM
-public value, and the server returns a KEM ciphertext, both as opaque `wimse-kem`
-byte sequences.
-Both sides derive two MAC keys (one per direction) and a session identifier using HKDF {{!RFC5869}}.
+The peers run HPKE {{!RFC9180}} in Base mode and use only the Export interface:
+the client is the HPKE recipient and sends an ephemeral recipient public key;
+the server is the HPKE sender and returns the encapsulated key `enc`.
+Both values are opaque `wimse-kem` byte sequences.
+Both sides export two MAC keys (one per direction) and a session identifier from
+the HPKE context.
 The server MAY issue an opaque ticket on the handshake response.
-The client MAY issue an opaque ticket on its first session request, after key derivation;
+The client MAY issue an opaque ticket on its first session request, after key export;
 see {{ticket}}.
-The client confirms possession of the derived keys by MACing its next request.
+The client confirms possession of the exported keys by MACing its next request.
 Further requests and responses use `hmac-sha256` and carry the session identifier;
 when tickets were issued, they carry those ticket parameters as well.
 There is no session rehandshake: when the session ends, the peers start a new handshake.
@@ -110,61 +107,91 @@ including WIT validation and the `wimse-workload-to-workload` tag.
 The handshake response MUST be signed.
 Clients that require this extension MUST include `wimse-sign-response` on the handshake request.
 
-## Key Agreement
+## Key Establishment
 
-The mandatory KEM suite is DHKEM(P-256, HKDF-SHA256) as defined in {{!RFC9180}}.
-The suite identifier on the wire is the string `dhkem-p256-hkdf-sha256`.
-Other suites are not defined by this document; the parameters below are designed so a later
-document can add them without changing message layout.
+The handshake uses HPKE {{!RFC9180}} in Base mode
+({{Section 5.1.1 of RFC9180}}) and obtains session secrets only through the Export
+interface ({{Section 5.3 of RFC9180}}).
 
-The handshake uses one DHKEM operation with a fresh key pair on each side
-({{Section 4.1 of RFC9180}}).
-In HPKE/DHKEM terms the client is the recipient and the server encapsulates to the
-client's public key:
+An HPKE ciphersuite is the triple `(kem_id, kdf_id, aead_id)` of two-octet identifiers
+from {{RFC9180}}.
+The mandatory ciphersuite is:
 
-* The client generates an ephemeral P-256 recipient key pair `(skR, pkR)`.
-* The server runs `Encap(pkR)`, which generates an ephemeral key pair `(skE, pkE)`
-  and returns `(shared_secret, enc)` with `enc = SerializePublicKey(pkE)`.
-* The client runs `Decap(enc, skR)` and obtains the same `shared_secret`.
+* `kem_id` = `0x0010` (DHKEM(P-256, HKDF-SHA256)),
+* `kdf_id` = `0x0001` (HKDF-SHA256),
+* `aead_id` = `0xFFFF` (Export-Only) ({{Section 7.3 of RFC9180}}).
 
-For this suite, `SerializePublicKey` is the uncompressed SEC 1 {{SECG1}} point encoding
-(`0x04 || X || Y`, 65 octets).
-Both `pkR` and `enc` use that encoding.
-Peers MUST validate KEM public-key inputs as required for DHKEM(P-256, HKDF-SHA256) in
-{{Section 7.1.4 of RFC9180}} before `Encap` or `Decap`.
+On the wire, that triple is the six-octet sequence
+`I2OSP(kem_id, 2) || I2OSP(kdf_id, 2) || I2OSP(aead_id, 2)`
+({{Section 4 of RFC9180}}, big-endian).
+Other ciphersuites are not defined by this document; the parameters below are designed so a
+later document can add them without changing message layout.
+
+Both sides use the same HPKE `info` value:
+
+~~~
+info = "wimse-httpsig-session" || 0x00 ||
+       suite || 0x00 ||
+       req_nonce || 0x00 || resp_nonce || 0x00 ||
+       SHA-256(client_WIT) ||
+       SHA-256(server_WIT)
+~~~
+
+where:
+
+* `suite` is the six-octet ciphersuite value from `wimse-kem-suite`.
+* `req_nonce` / `resp_nonce` are the parsed handshake `nonce` values
+  ({{Section 2.3 of RFC9421}}) as UTF-8 octets and without the surrounding quotes.
+* `client_WIT` / `server_WIT` are the handshake request and response
+  `Workload-Identity-Token` header field values (JWTs), as ASCII octets.
+* `SHA-256(...)` denotes the 32-octet SHA-256 hash of those octets.
+
+The server constructs `info` when creating the handshake response (it chooses
+`resp_nonce` and knows both WIT values).
+The client constructs the same `info` after receiving that response.
+
+The client is the HPKE recipient and the server is the HPKE sender:
+
+* The client runs `GenerateKeyPair()` and obtains a recipient key pair `(skR, pkR)`.
+* When generating the handshake response, the server runs `SetupBaseS(pkR, info)`,
+  which returns `(enc, context_S)`.
+* After receiving that response, the client runs `SetupBaseR(enc, skR, info)` and
+  obtains `context_R`.
+* Both sides export session secrets from their context as specified in {{key-derivation}}.
+
+Public keys and `enc` are encoded as specified by the selected HPKE KEM.
+Peers MUST validate KEM public-key inputs as required by the selected HPKE KEM
+before `SetupBaseS` or `SetupBaseR`.
+For the mandatory suite, that validation is {{Section 7.1.4 of RFC9180}}.
 
 The handshake request MUST include the signature parameters:
 
-* `wimse-kem-suite`: String; MUST be `dhkem-p256-hkdf-sha256`.
-* `wimse-kem`: Byte Sequence; `SerializePublicKey(pkR)`.
+* `wimse-kem-suite`: Byte Sequence; MUST be the six octets
+  `0x00 0x10 0x00 0x01 0xFF 0xFF`.
+* `wimse-kem`: Byte Sequence; the serialized recipient public key `pkR`.
 
 The handshake request MUST NOT include `wimse-ticket-client` or `wimse-ticket-server`.
 
 The handshake response MUST include:
 
-* `wimse-kem-suite`: String; MUST equal the request's suite.
-* `wimse-kem`: Byte Sequence; `enc` from `Encap(pkR)`.
+* `wimse-kem-suite`: Byte Sequence; MUST equal the request's `wimse-kem-suite`.
+* `wimse-kem`: Byte Sequence; `enc` from `SetupBaseS(pkR, info)`.
 
 The handshake response MAY also include `wimse-ticket-server`; see {{ticket}}.
 The handshake response MUST NOT include `wimse-ticket-client`.
 
 Those parameters are covered by `@signature-params` as usual for {{RFC9421}}.
 The private key associated with the WIT is used only to sign.
-It MUST NOT be used as a KEM key.
+It MUST NOT be used as an HPKE recipient key.
 
 
-# Key Derivation {#key-derivation}
+# Key Export {#key-derivation}
 
-Both sides compute:
+Both sides export MAC keys and a session identifier from the HPKE context
+established in {{handshake}}:
 
 ~~~
-PRK = HKDF-Extract(salt=32 zero octets, IKM=shared_secret)
-info = "wimse-httpsig-session" || 0x00 ||
-       suite || 0x00 ||
-       req_nonce || 0x00 || resp_nonce || 0x00 ||
-       SHA-256(client_WIT) ||
-       SHA-256(server_WIT)
-OKM = HKDF-Expand(PRK, info, 80)
+OKM = Context.Export("session-keys", 80)
 k_req = OKM[0..31]
 k_res = OKM[32..63]
 session_id = OKM[64..79]
@@ -172,19 +199,15 @@ session_id = OKM[64..79]
 
 where:
 
-* `shared_secret` is the DHKEM output of `Encap` / `Decap` from {{handshake}}.
-* `suite` is the ASCII suite identifier.
-* `req_nonce` / `resp_nonce` are the parsed handshake `nonce` values
-  ({{Section 2.3 of RFC9421}}) as ASCII octets and without the surrounding quotes.
-* `client_WIT` / `server_WIT` are the handshake request and response
-  `Workload-Identity-Token` header field values (compact JWS serialization),
-  as ASCII octets.
-* `SHA-256(...)` denotes the 32-octet SHA-256 hash of those octets.
+* `Context` is `context_S` on the server and `context_R` on the client.
+* `Context.Export` is the HPKE secret export interface
+  ({{Section 5.3 of RFC9180}}) with `exporter_context` equal to the ASCII string
+  `session-keys`.
 
 `k_req` MACs session requests.
 `k_res` MACs session responses.
 `session_id` is the session identifier carried as `wimse-session-id` in {{session}}.
-Both peers compute it from the handshake transcript; it is not sent on the handshake.
+Both peers compute it from the HPKE export; it is not sent on the handshake.
 
 
 # Session Messages {#session}
@@ -197,7 +220,7 @@ A session signature on a request or response:
 
 * MUST use `tag` = `wimse-httpsig-session`.
 * MUST use the HTTP Message Signatures algorithm `hmac-sha256`.
-* MUST include `wimse-session-id`: Byte Sequence; the `session_id` value computed in
+* MUST include `wimse-session-id`: Byte Sequence; the `session_id` value exported in
   {{key-derivation}}.
 * Ticket parameters follow {{ticket}}: `wimse-ticket-server` when established on the
   handshake response; `wimse-ticket-client` when established on a prior or current
@@ -242,7 +265,7 @@ Each session has its own `session_id`, key material, and, when issued, its own t
 
 Tickets are optional per session and issuer-specific.
 `wimse-session-id` identifies the session on the wire in {{session}};
-its value is computed in {{key-derivation}}.
+its value is exported in {{key-derivation}}.
 A peer that keeps session keys in local (or shared) state keyed by `session_id`
 MAY omit its ticket.
 A ticket is useful when a replica of that issuer must recover session keys without that
@@ -253,12 +276,12 @@ This document defines two signature parameters, each an opaque Byte Sequence:
 * `wimse-ticket-client`: issued by the client; only the client deployment opens it.
 * `wimse-ticket-server`: issued by the server; only the server deployment opens it.
 
-Issuance happens only after the issuer can populate the ticket with the derived
+Issuance happens only after the issuer can populate the ticket with the exported
 MAC keys ({{key-derivation}}) and `session_exp` ({{lifetime}}):
 
 * The server MAY include `wimse-ticket-server` on the handshake response.
 * The client MUST NOT include `wimse-ticket-client` on the handshake request.
-  The client MAY include `wimse-ticket-client` on a session request after key derivation
+  The client MAY include `wimse-ticket-client` on a session request after key export
   (typically the first session request).
 * Once `wimse-ticket-server` has been established, session requests and responses MUST
   echo that same value and MUST NOT change it for the rest of the session.
@@ -289,8 +312,7 @@ The following content is RECOMMENDED inside the protected ticket material:
 * `k_req` and `k_res` (or equivalent key material),
 * client and server `sub` values,
 * `wimse-aud`,
-* `session_exp`,
-* KEM suite identifier.
+* `session_exp`.
 
 A recipient that uses a ticket to obtain keys MUST reject it if the ticket cannot be
 decoded or authenticated under current local policy.
@@ -316,8 +338,7 @@ with the base profile.
 The following messages illustrate one handshake and the first session exchange
 between the same peers.
 The `nonce` values are illustrative and do not meet the entropy requirement of the
-base profile. Some values are
-truncated for readability.
+base profile. Some values are truncated for readability.
 
 ~~~ http
 {::include includes/fast-hs-request.txt.out}
@@ -344,14 +365,21 @@ truncated for readability.
 
 The base profile's considerations in {{I-D.ietf-wimse-http-signature}} apply to the handshake.
 
-An attacker that breaks P-256 ECDH for a recorded handshake can forge session MACs
+An attacker that breaks the HPKE KEM for a recorded handshake can forge session MACs
 until `session_exp`; see {{lifetime}}.
 Authentication of the handshake itself remains the WIT signature algorithms
 (`ES256`, `Ed25519`, and others allowed by {{I-D.ietf-wimse-workload-creds}}).
 Those algorithms are not post-quantum.
-This document's suite identifier and opaque `wimse-kem` layout are intended so a
-future KEM can harden the session secret without changing the message pattern;
-that does not by itself make workload authentication post-quantum.
+This document's HPKE ciphersuite codepoints and opaque `wimse-kem` layout are intended
+so a future HPKE KEM can harden the exported session secret without changing the message
+pattern; that does not by itself make workload authentication post-quantum.
+
+HPKE export secrets are determined by the HPKE context.
+A replayed `enc` with the same `info` yields the same exported keys
+({{Section 5.3 of RFC9180}}).
+The WIT-signed handshake and its `nonce` values bind that context to a single
+authenticated exchange; session-message `nonce` values still apply as in the base
+profile.
 
 The first session request is the client's key-confirmation message.
 A peer that sees only the handshake response may not hold `k_req`.
@@ -374,7 +402,8 @@ Revocation or status checks that require the WIT apply at handshake time only.
 After that, authority to speak in the session is carried by the MAC keys
 and `wimse-session-id` until `session_exp`; see {{lifetime}}.
 
-`session_id` is derived from the same PRK as the MAC keys but is carried in cleartext.
+`session_id` is taken from the same Export output as the MAC keys but is carried in
+cleartext.
 It identifies the session; it is not a secret authenticator.
 Possession of `session_id` alone does not allow forging session MACs.
 
@@ -401,19 +430,21 @@ per {{Section 6.3.1 of RFC9421}}:
 ### `wimse-kem-suite`
 
 * Name: `wimse-kem-suite`
-* Description: String; KEM suite identifier for a WIMSE fast HTTP signature handshake.
+* Description: Byte Sequence; HPKE ciphersuite `kem_id || kdf_id || aead_id` for a WIMSE
+  fast HTTP signature handshake.
 * Reference: RFC XXX, {{handshake}}.
 
 ### `wimse-kem`
 
 * Name: `wimse-kem`
-* Description: Byte Sequence; ephemeral KEM public share for a WIMSE fast HTTP signature handshake.
+* Description: Byte Sequence; HPKE recipient public key on the handshake request, or HPKE
+  `enc` on the handshake response.
 * Reference: RFC XXX, {{handshake}}.
 
 ### `wimse-session-id`
 
 * Name: `wimse-session-id`
-* Description: Byte Sequence; transcript-derived session identifier for WIMSE fast HTTP
+* Description: Byte Sequence; HPKE-exported session identifier for WIMSE fast HTTP
   signature session messages.
 * Reference: RFC XXX, {{key-derivation}}, {{session}}.
 
@@ -421,7 +452,7 @@ per {{Section 6.3.1 of RFC9421}}:
 
 * Name: `wimse-ticket-client`
 * Description: Byte Sequence; optional opaque client-issued session ticket for WIMSE fast
-  HTTP signature session messages (issued after key derivation).
+  HTTP signature session messages (issued after key export).
 * Reference: RFC XXX, {{ticket}}.
 
 ### `wimse-ticket-server`
