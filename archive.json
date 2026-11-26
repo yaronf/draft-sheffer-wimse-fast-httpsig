@@ -1,6 +1,6 @@
 {
   "magic": "E!vIA5L86J2I",
-  "timestamp": "2026-11-24T07:44:37.186678+00:00",
+  "timestamp": "2026-11-26T06:09:06.874762+00:00",
   "repo": "yaronf/draft-sheffer-wimse-fast-httpsig",
   "labels": [
     {
@@ -98,7 +98,7 @@
       "labels": [],
       "body": "The draft is very tied to DHKEM primitives.  IT should up level to describe in terms of HPKE interfaces. ",
       "createdAt": "2026-11-23T01:31:39Z",
-      "updatedAt": "2026-11-23T01:31:39Z",
+      "updatedAt": "2026-11-26T05:44:34Z",
       "closedAt": null,
       "comments": []
     },
@@ -114,7 +114,7 @@
       "labels": [],
       "body": "The draft is slicing up HPKE and just seems to use the KEM portion.  It would provide a cleaner interface and more modularity if you use exporter instead. Section 5.3 of draft-ietf-hpke-hpke.  Then we will not have to define a key derivation in this document and an HPKE KDF can be used. \n",
       "createdAt": "2026-11-23T01:42:12Z",
-      "updatedAt": "2026-11-23T01:42:12Z",
+      "updatedAt": "2026-11-26T05:44:34Z",
       "closedAt": null,
       "comments": []
     }
@@ -161,6 +161,32 @@
           "comments": []
         }
       ]
+    },
+    {
+      "number": 5,
+      "id": "PR_kwDOVv8bsc8AAAABSBti6w",
+      "title": "Use HPKE Base Setup and Export for the handshake",
+      "url": "https://github.com/yaronf/draft-sheffer-wimse-fast-httpsig/pull/5",
+      "state": "OPEN",
+      "author": "yaronf",
+      "authorAssociation": "OWNER",
+      "assignees": [],
+      "labels": [],
+      "body": "## Summary\n- Redefine the handshake in terms of HPKE Base SetupBaseS/SetupBaseR and Export (closes #3, closes #4): suite is the six-octet ID triple, info binds the transcript, Export yields MAC keys and session_id.\n- Refresh folded examples for the new wire encoding, and tighten follow-up wording (amortization goal, key establishment, JWT WIT octets, drop Seal/Open asides and ticket suite fields).\n\n\nMade with [Cursor](https://cursor.com)",
+      "createdAt": "2026-11-26T05:44:32Z",
+      "updatedAt": "2026-11-26T05:44:33Z",
+      "baseRepository": "yaronf/draft-sheffer-wimse-fast-httpsig",
+      "baseRefName": "main",
+      "baseRefOid": "b99a37382e1365d6d13a830148c6799dfab878ec",
+      "headRepository": "yaronf/draft-sheffer-wimse-fast-httpsig",
+      "headRefName": "ys-3",
+      "headRefOid": "a945951c90398703870a9b4b61c6255ccd7bac21",
+      "closedAt": null,
+      "mergedAt": null,
+      "mergedBy": null,
+      "mergeCommit": null,
+      "comments": [],
+      "reviews": []
     }
   ]
 }
