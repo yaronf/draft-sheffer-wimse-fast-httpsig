@@ -70,7 +70,8 @@ Goals:
 * Amortize WIT carriage and asymmetric signature and verification over many
   calls between the same workloads.
 * Extend the base profile; remain verifiable across TLS-terminating intermediaries, as in the base profile.
-* Keep the wire format open to a future post-quantum KEM without a redesign.
+* Select a classical or post-quantum HPKE ciphersuite from the client's WIT signature
+  algorithm without changing the message layout.
 
 
 # Conventions and Definitions
@@ -114,18 +115,32 @@ The handshake uses HPKE {{!RFC9180}} in Base mode
 interface ({{Section 5.3 of RFC9180}}).
 
 An HPKE ciphersuite is the triple `(kem_id, kdf_id, aead_id)` of two-octet identifiers
-from {{RFC9180}}.
-The mandatory ciphersuite is:
-
-* `kem_id` = `0x0010` (DHKEM(P-256, HKDF-SHA256)),
-* `kdf_id` = `0x0001` (HKDF-SHA256),
-* `aead_id` = `0xFFFF` (Export-Only) ({{Section 7.3 of RFC9180}}).
-
+from {{RFC9180}} and {{!I-D.ietf-hpke-pq}}.
 On the wire, that triple is the six-octet sequence
 `I2OSP(kem_id, 2) || I2OSP(kdf_id, 2) || I2OSP(aead_id, 2)`
 ({{Section 4 of RFC9180}}, big-endian).
+
+This document defines two ciphersuites.
+Both use `kdf_id` = `0x0001` (HKDF-SHA256) and `aead_id` = `0xFFFF` (Export-Only)
+({{Section 7.3 of RFC9180}}).
+
+The classical ciphersuite is:
+
+* `kem_id` = `0x0010` (DHKEM(P-256, HKDF-SHA256)),
+* wire value `0x00 0x10 0x00 0x01 0xFF 0xFF`.
+
+The post-quantum ciphersuite is:
+
+* `kem_id` = `0x0041` (ML-KEM-768) {{!I-D.ietf-hpke-pq}},
+* wire value `0x00 0x41 0x00 0x01 0xFF 0xFF`.
+
+Implementations MUST implement the classical ciphersuite.
+Implementations of this extension that accept ML-DSA WIT algorithms
+({{!RFC9964}}) MUST also implement the post-quantum ciphersuite.
 Other ciphersuites are not defined by this document; the parameters below are designed so a
 later document can add them without changing message layout.
+
+Suite selection is specified in {{suite-selection}}.
 
 Both sides use the same HPKE `info` value:
 
@@ -162,12 +177,13 @@ The client is the HPKE recipient and the server is the HPKE sender:
 Public keys and `enc` are encoded as specified by the selected HPKE KEM.
 Peers MUST validate KEM public-key inputs as required by the selected HPKE KEM
 before `SetupBaseS` or `SetupBaseR`.
-For the mandatory suite, that validation is {{Section 7.1.4 of RFC9180}}.
+For the classical ciphersuite, that validation is {{Section 7.1.4 of RFC9180}}.
+For the post-quantum ciphersuite, that validation is {{!I-D.ietf-hpke-pq}}.
 
 The handshake request MUST include the signature parameters:
 
-* `wimse-kem-suite`: Byte Sequence; MUST be the six octets
-  `0x00 0x10 0x00 0x01 0xFF 0xFF`.
+* `wimse-kem-suite`: Byte Sequence; MUST be the six-octet wire value of the
+  ciphersuite selected in {{suite-selection}}.
 * `wimse-kem`: Byte Sequence; the serialized recipient public key `pkR`.
 
 The handshake request MUST NOT include `wimse-ticket-client` or `wimse-ticket-server`.
@@ -183,6 +199,27 @@ The handshake response MUST NOT include `wimse-ticket-client`.
 Those parameters are covered by `@signature-params` as usual for {{RFC9421}}.
 The private key associated with the WIT is used only to sign.
 It MUST NOT be used as an HPKE recipient key.
+
+
+## Suite Selection {#suite-selection}
+
+The HTTP message signature algorithm on the handshake request is the `alg` member of
+the `cnf.jwk` object in the client's WIT
+({{Section 3.1 of I-D.ietf-wimse-http-signature}}).
+The client selects the HPKE ciphersuite from that algorithm as follows:
+
+* If `cnf.jwk.alg` is `ML-DSA-44`, `ML-DSA-65`, or `ML-DSA-87` {{!RFC9964}},
+  the client MUST use the post-quantum ciphersuite.
+* Otherwise, for any other WIT signature algorithm allowed by
+  {{I-D.ietf-wimse-workload-creds}}, the client MUST use the classical ciphersuite.
+
+The client MUST set `wimse-kem-suite` to the wire value of that selected ciphersuite.
+The server's WIT signature algorithm does not change the selected ciphersuite.
+
+A server that does not implement the requested ciphersuite MUST NOT include
+`wimse-kem-suite` and `wimse-kem` as required for this extension on the handshake
+response.
+The client then treats the extension as not negotiated ({{negotiate}}).
 
 
 # Key Export {#key-derivation}
@@ -367,12 +404,16 @@ The base profile's considerations in {{I-D.ietf-wimse-http-signature}} apply to 
 
 An attacker that breaks the HPKE KEM for a recorded handshake can forge session MACs
 until `session_exp`; see {{lifetime}}.
+With the classical ciphersuite, a future quantum attacker that breaks DHKEM can forge
+those MACs.
+With the post-quantum ciphersuite, the exported MAC keys resist that class of attack on
+the KEM.
 Authentication of the handshake itself remains the WIT signature algorithms
-(`ES256`, `Ed25519`, and others allowed by {{I-D.ietf-wimse-workload-creds}}).
-Those algorithms are not post-quantum.
-This document's HPKE ciphersuite codepoints and opaque `wimse-kem` layout are intended
-so a future HPKE KEM can harden the exported session secret without changing the message
-pattern; that does not by itself make workload authentication post-quantum.
+allowed by {{I-D.ietf-wimse-workload-creds}}.
+Handshake authentication is post-quantum only when those algorithms are
+(`ML-DSA-44`, `ML-DSA-65`, or `ML-DSA-87`).
+Selecting the post-quantum HPKE ciphersuite for a classical WIT algorithm is not
+defined; see {{suite-selection}}.
 
 HPKE export secrets are determined by the HPKE context.
 A replayed `enc` with the same `info` yields the same exported keys
