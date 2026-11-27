@@ -1,0 +1,2095 @@
+<!DOCTYPE html>
+<html lang="en" class="Internet-Draft">
+<head>
+<meta charset="utf-8">
+<meta content="Common,Latin" name="scripts">
+<meta content="initial-scale=1.0" name="viewport">
+<title>Fast HTTP Message Signatures for WIMSE</title>
+<meta content="Yaron Sheffer" name="author">
+<meta content="Joe Salowey" name="author">
+<meta content="
+       The WIMSE HTTP Message Signatures profile authenticates each HTTP request
+with a Workload Identity Token (WIT) and an asymmetric signature.
+Carrying and validating the WIT dominates that cost.
+This document defines an optional extension that reduces that cost:
+peers run a short handshake to establish shared MAC keys, then authenticate
+later requests and responses between the same workloads without the WIT. 
+    " name="description">
+<meta content="xml2rfc 3.35.0" name="generator">
+<meta content="workload" name="keyword">
+<meta content="identity" name="keyword">
+<meta content="HTTP Message Signatures" name="keyword">
+<meta content="draft-sheffer-wimse-fast-httpsig-latest" name="ietf.draft">
+<!-- Generator version information:
+  xml2rfc 3.35.0
+    Python 3.14.10
+    ConfigArgParse 1.10.1
+    google-i18n-address 3.1.1
+    intervaltree 3.2.1
+    Jinja2 3.1.6
+    lxml 6.1.1
+    natsort 8.4.0
+    platformdirs 4.14.7
+    pycountry 24.6.1
+    PyYAML 6.0.3
+    requests 2.33.1
+    wcwidth 0.9.4
+-->
+<link href="draft-sheffer-wimse-fast-httpsig.xml" rel="alternate" type="application/rfc+xml">
+<link href="#copyright" rel="license">
+<style type="text/css">@font-face {
+  font-family: 'Lora';
+  font-style: italic;
+  font-weight: 400;
+  font-display: swap;
+  src: local('Lora Italic'), local('Lora-Italic'), url('https://martinthomson.github.io/rfc-css/fonts/lora-italic-cyrillic-ext.woff2') format('woff2');
+  unicode-range: U+0460-052F, U+1C80-1C88, U+20B4, U+2DE0-2DFF, U+A640-A69F, U+FE2E-FE2F;
+}
+@font-face {
+  font-family: 'Lora';
+  font-style: italic;
+  font-weight: 400;
+  font-display: swap;
+  src: local('Lora Italic'), local('Lora-Italic'), url('https://martinthomson.github.io/rfc-css/fonts/lora-italic-cyrillic-ext.woff2') format('woff2');
+  unicode-range: U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
+}
+@font-face {
+  font-family: 'Lora';
+  font-style: italic;
+  font-weight: 400;
+  font-display: swap;
+  src: local('Lora Italic'), local('Lora-Italic'), url('https://martinthomson.github.io/rfc-css/fonts/lora-italic-vietnamese.woff2') format('woff2');
+  unicode-range: U+0102-0103, U+0110-0111, U+1EA0-1EF9, U+20AB;
+}
+@font-face {
+  font-family: 'Lora';
+  font-style: italic;
+  font-weight: 400;
+  font-display: swap;
+  src: local('Lora Italic'), local('Lora-Italic'), url('https://martinthomson.github.io/rfc-css/fonts/lora-italic-latin-ext.woff2') format('woff2');
+  unicode-range: U+0100-024F, U+0259, U+1E00-1EFF, U+2020, U+20A0-20AB, U+20AD-20CF, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: 'Lora';
+  font-style: italic;
+  font-weight: 400;
+  font-display: swap;
+  src: local('Lora Italic'), local('Lora-Italic'), url('https://martinthomson.github.io/rfc-css/fonts/lora-italic-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'Lora';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: local('Lora Regular'), local('Lora-Regular'), url('https://martinthomson.github.io/rfc-css/fonts/lora-regular-cyrillic-ext.woff2') format('woff2');
+  unicode-range: U+0460-052F, U+1C80-1C88, U+20B4, U+2DE0-2DFF, U+A640-A69F, U+FE2E-FE2F;
+}
+@font-face {
+  font-family: 'Lora';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: local('Lora Regular'), local('Lora-Regular'), url('https://martinthomson.github.io/rfc-css/fonts/lora-regular-cyrillic.woff2') format('woff2');
+  unicode-range: U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
+}
+@font-face {
+  font-family: 'Lora';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: local('Lora Regular'), local('Lora-Regular'), url('https://martinthomson.github.io/rfc-css/fonts/lora-regular-vietnamese.woff2') format('woff2');
+  unicode-range: U+0102-0103, U+0110-0111, U+1EA0-1EF9, U+20AB;
+}
+@font-face {
+  font-family: 'Lora';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: local('Lora Regular'), local('Lora-Regular'), url('https://martinthomson.github.io/rfc-css/fonts/lora-regular-latin-ext.woff2') format('woff2');
+  unicode-range: U+0100-024F, U+0259, U+1E00-1EFF, U+2020, U+20A0-20AB, U+20AD-20CF, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: 'Lora';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: local('Lora Regular'), local('Lora-Regular'), url('https://martinthomson.github.io/rfc-css/fonts/lora-regular-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'Lora';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: local('Lora Bold'), local('Lora-Bold'), url('https://martinthomson.github.io/rfc-css/fonts/lora-bold-cyrillic-ext.woff2') format('woff2');
+  unicode-range: U+0460-052F, U+1C80-1C88, U+20B4, U+2DE0-2DFF, U+A640-A69F, U+FE2E-FE2F;
+}
+@font-face {
+  font-family: 'Lora';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: local('Lora Bold'), local('Lora-Bold'), url('https://martinthomson.github.io/rfc-css/fonts/lora-bold-cyrillic.woff2') format('woff2');
+  unicode-range: U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
+}
+@font-face {
+  font-family: 'Lora';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: local('Lora Bold'), local('Lora-Bold'), url('https://martinthomson.github.io/rfc-css/fonts/lora-bold-vietnamese.woff2') format('woff2');
+  unicode-range: U+0102-0103, U+0110-0111, U+1EA0-1EF9, U+20AB;
+}
+@font-face {
+  font-family: 'Lora';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: local('Lora Bold'), local('Lora-Bold'), url('https://martinthomson.github.io/rfc-css/fonts/lora-bold-latin-ext.woff2') format('woff2');
+  unicode-range: U+0100-024F, U+0259, U+1E00-1EFF, U+2020, U+20A0-20AB, U+20AD-20CF, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: 'Lora';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: local('Lora Bold'), local('Lora-Bold'), url('https://martinthomson.github.io/rfc-css/fonts/lora-bold-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'Lora';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: local('Lora SemiBold'), local('Lora-SemiBold'), url('https://martinthomson.github.io/rfc-css/fonts/lora-semibold-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: 'Oxygen Mono';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: local('Oxygen Mono'), local('OxygenMono-Regular'), url('https://martinthomson.github.io/rfc-css/fonts/oxygenmono-regular-latin-ext.woff2') format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: 'Oxygen Mono';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: local('Oxygen Mono'), local('OxygenMono-Regular'), url('https://martinthomson.github.io/rfc-css/fonts/oxygenmono-regular-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: 'Sofia Sans Semi Condensed';
+  font-style: italic;
+  font-weight: 1 1000;
+  src: url('https://martinthomson.github.io/rfc-css/fonts/sofiasanssemicondensed-italic-cyrillic-ext.woff2') format('woff2');
+  unicode-range: U+0460-052F, U+1C80-1C8A, U+20B4, U+2DE0-2DFF, U+A640-A69F, U+FE2E-FE2F;
+}
+@font-face {
+  font-family: 'Sofia Sans Semi Condensed';
+  font-style: italic;
+  font-weight: 1 1000;
+  src: url('https://martinthomson.github.io/rfc-css/fonts/sofiasanssemicondensed-italic-cyrillic.woff2') format('woff2');
+  unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
+}
+@font-face {
+  font-family: 'Sofia Sans Semi Condensed';
+  font-style: italic;
+  font-weight: 1 1000;
+  src: url('https://martinthomson.github.io/rfc-css/fonts/sofiasanssemicondensed-italic-greek.woff2') format('woff2');
+  unicode-range: U+0370-0377, U+037A-037F, U+0384-038A, U+038C, U+038E-03A1, U+03A3-03FF;
+}
+@font-face {
+  font-family: 'Sofia Sans Semi Condensed';
+  font-style: italic;
+  font-weight: 1 1000;
+  src: url('https://martinthomson.github.io/rfc-css/fonts/sofiasanssemicondensed-italic-latin-ext.woff2') format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: 'Sofia Sans Semi Condensed';
+  font-style: italic;
+  font-weight: 1 1000;
+  src: url('https://martinthomson.github.io/rfc-css/fonts/sofiasanssemicondensed-italic-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'Sofia Sans Semi Condensed';
+  font-style: normal;
+  font-weight: 1 1000;
+  src: url('https://martinthomson.github.io/rfc-css/fonts/sofiasanssemicondensed-regular-cyrillic-ext.woff2') format('woff2');
+  unicode-range: U+0460-052F, U+1C80-1C8A, U+20B4, U+2DE0-2DFF, U+A640-A69F, U+FE2E-FE2F;
+}
+@font-face {
+  font-family: 'Sofia Sans Semi Condensed';
+  font-style: normal;
+  font-weight: 1 1000;
+  src: url('https://martinthomson.github.io/rfc-css/fonts/sofiasanssemicondensed-regular-cyrillic.woff2') format('woff2');
+  unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
+}
+@font-face {
+  font-family: 'Sofia Sans Semi Condensed';
+  font-style: normal;
+  font-weight: 1 1000;
+  src: url('https://martinthomson.github.io/rfc-css/fonts/sofiasanssemicondensed-regular-greek.woff2') format('woff2');
+  unicode-range: U+0370-0377, U+037A-037F, U+0384-038A, U+038C, U+038E-03A1, U+03A3-03FF;
+}
+@font-face {
+  font-family: 'Sofia Sans Semi Condensed';
+  font-style: normal;
+  font-weight: 1 1000;
+  src: url('https://martinthomson.github.io/rfc-css/fonts/sofiasanssemicondensed-regular-latin-ext.woff2') format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: 'Sofia Sans Semi Condensed';
+  font-style: normal;
+  font-weight: 1 1000;
+  src: url('https://martinthomson.github.io/rfc-css/fonts/sofiasanssemicondensed-regular-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+:root {
+  color-scheme: light dark;
+  --background-color: #fff;
+  --text-color: #222;
+  --title-color: #191919;
+  --link-color: #2a6496;
+  --highlight-color: #f9f9f9;
+  --line-color: #eee;
+  --pilcrow-weak: #ddd;
+  --pilcrow-strong: #bbb;
+  --small-font-size: 14.5px;
+  --font-mono: 'Oxygen Mono', monospace;
+  --font-title: "Sofia Sans Semi Condensed", sans-serif;
+  scrollbar-color: #bbb #eee;
+}
+body {
+  max-width: 600px;
+  margin: 75px auto;
+  padding: 0 5px;
+  color: var(--text-color);
+  background-color: var(--background-color);
+  font: 16px/22px "Lora", serif;
+  scroll-behavior: smooth;
+}
+
+.ears {
+  display: none;
+}
+
+/* headings */
+section {
+  clear: both;
+}
+.section-number {
+  padding-right: 0.5em;
+}
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-title);
+  font-weight: 680;
+  margin: 0.8em 0 0.3em;
+  font-size-adjust: 0.5;
+  color: var(--title-color);
+}
+h1 {
+  &#title {
+    font-size: 32px;
+    line-height: 40px;
+    clear: both;
+    margin: 1.5em 0 0.2em;
+  }
+  &#rfcnum {
+    margin: 1.5em 0 0.2em;
+    & + h1#title {
+      margin: 0.2em 0;
+    }
+  }
+}
+
+h1, h2, h3 {
+  font-size: 22px;
+  line-height: 27px;
+}
+h4, h5, h6 {
+  font-size: 20px;
+  line-height: 24px;
+}
+
+/* general structure */
+.author {
+  padding-bottom: 0.3em;
+  vertical-align: top;
+}
+#abstract+p {
+  font-size: 18px;
+  line-height: 24px;
+  & code, & samp, & tt {
+    font-size: 16px;
+    line-height: 0;
+  }
+}
+
+p {
+  padding: 0;
+  margin: 0.5em 0;
+  text-align: left;
+}
+div {
+  margin: 0;
+}
+.alignRight {
+  margin: 1em 0;
+  &.art-text {
+    background-color: var(--highlight-color);
+    border: 1px solid var(--line-color);
+    border-radius: 3px;
+    padding: 0.5em 1em 0;
+    margin-bottom: 0.5em;
+    & pre {
+      padding: 0;
+      width: auto;
+    }
+  }
+  & > *:first-child {
+    border: none;
+    margin: 0;
+    float: right;
+    clear: both;
+  }
+  & > *:nth-child(2) {
+    clear: both;
+    display: block;
+    border: none;
+  }
+}
+svg {
+  display: block;
+  /* font-family isn't space-separated, but =~ will have to do */
+  &[font-family~="monospace" i], & [font-family~="monospace" i] {
+    font-family: var(--font-mono);
+  }
+}
+.alignCenter {
+  margin: 1em 0;
+  &.art-text {
+    background-color: var(--highlight-color);
+    border: 1px solid var(--line-color);
+    border-radius: 3px;
+    padding: 0.5em 1em 0;
+    margin-bottom: 0.5em;
+    & pre {
+      padding: 0;
+      width: auto;
+    }
+  }
+  & > *:first-child {
+    border: none;
+    /* this isn't optimal, but it's an existence proof.  PrinceXML doesn't
+       support flexbox yet.
+    */
+    display: table;
+    margin: 0 auto;
+  }
+}
+
+/* lists */
+ol, ul {
+  padding: 0;
+  margin: 0 0 0.5em 2em;
+  & :is(ol, ul) {
+    margin-left: 1em;
+  }
+}
+li {
+  margin: 0 0 0.25em 0;
+}
+ul.empty, .ulEmpty {
+  list-style-type: none;
+  & li {
+    margin-top: 0.5em;
+  }
+}
+:is(ul, ol).compact, .ulCompact, .olCompact {
+  margin: 0 0 0 2em;
+  & li {
+    margin: 0;
+    & :first-child { margin-top: 0; }
+    & :last-child { margin-bottom: 0; }
+  }
+}
+
+/* definition lists */
+dl {
+  clear: left;
+  --indent: 3ch;
+  /* --indent: attr(indent ch); not supported in any browser, but we can dream */
+  &.olPercent {
+    --indent: 5ch;
+    & > dt {
+      min-width: calc(var(--indent) - 2ch);
+      float: none;
+    }
+  }
+
+  dl > dd > & {
+    margin-top: 0.5em;
+    margin-bottom: 0;
+  }
+
+  &:not(.dlNewline) > dt {
+    float: left;
+    margin-right: 2ch;
+    min-width: 8ch;
+  }
+  & > dd {
+    margin-bottom: .8em;
+    margin-left: var(--indent) !important; /* stupid element overrides */
+    min-height: 2ex;
+  }
+}
+:is(dl.compact, .dlCompact) > dd {
+  margin-bottom: 0;
+  & > :is(:first-child, .break:first-child + *) {
+    margin-top: 0;
+  }
+  & > :is(:last-child) {
+    margin-bottom: 0;
+  }
+}
+:is(dd, span).break {
+  display: none;
+}
+
+/* links */
+a {
+  text-decoration: none;
+  &[href] {
+    color: var(--link-color);
+    &:hover { text-decoration: underline; }
+    &.selfRef {
+      color: var(--text-color);
+      &:hover {
+        text-decoration: none;
+        background-color: var(--highlight-color);
+      }
+    }
+  }
+}
+.iref + a[href].internal {
+  color: var(--text-color);
+}
+a.xref:is(.cite, .auto), :is(#status-of-memo, #copyright) a {
+  white-space: nowrap;
+}
+
+/* Figures */
+tt, code, pre {
+  background-color: var(--highlight-color);
+  font: 14px/22px var(--font-mono);
+}
+tt, code {
+  /* changing the font for inline elements leads to different ascender
+     and descender heights; as we want to retain baseline alignment,
+     remove leading to avoid altering the final height of lines
+     note: this fails if these blocks take an entire line,
+     a different solution would be great */
+  line-height: 0;
+}
+:is(h1, h2, h3, h4, h5, h6) :is(tt, code) {
+  font-size: 84%;
+}
+pre {
+  border: 1px solid var(--line-color);
+  font-size: 13.5px;
+  line-height: 16px;
+  letter-spacing: -0.2px;
+  margin: 5px;
+  padding: 5px;
+}
+img {
+  max-width: 100%;
+}
+figure {
+  margin: 0.5em 0;
+  padding: 0;
+  & blockquote {
+    margin: 0.8em 0.4em 0.4em;
+  }
+}
+figcaption, caption {
+  font-style: italic;
+  margin: 0.5em 1.5em;
+  text-align: left;
+  caption-side: bottom;
+}
+@media screen {
+  /* Auto-collapse boilerplate. */
+  :is(#status-of-memo, #copyright) {
+    & p {
+      margin: -2px 0;
+      max-height: 0;
+      transition: max-height 2s ease, margin 0.5s ease 0.5s;
+      overflow: hidden;
+    }
+    &:hover p,
+    & h2:target ~ p {
+      margin: 0.5em 0;
+      max-height: 500px;
+      overflow: auto;
+    }
+  }
+  pre, svg {
+    display: inline-block;
+    /* In the horizontal direction, sometimes people make over-sized figures.
+       Scrollbars for those is therefore necessary: auto adds them as necessary..
+       In the vertical direction, the line-height can combine with the font
+       asender/descender height to produce scrollbars: hidden avoids that. */
+    overflow: auto hidden;
+  }
+  pre {
+    max-width: 100%;
+    width: calc(100% - 22px - 1em);
+  }
+  svg {
+    max-width: calc(100% - 22px - 1em);
+  }
+  figure pre {
+    display: block;
+    width: calc(100% - 25px);
+  }
+  :is(pre, svg) + .pilcrow {
+    display: inline-block;
+    vertical-align: text-bottom;
+    padding-bottom: 8px;
+  }
+}
+
+/* aside, blockquote */
+aside, blockquote {
+  margin-left: 0;
+  padding: 0 2em;
+  font-style: italic;
+}
+blockquote {
+  margin: 1em 0;
+  border-left: 2px var(--pilcrow-strong) solid;
+}
+cite {
+  display: block;
+  text-align: right;
+  font-style: italic;
+}
+
+/* tables */
+table {
+  width: auto;
+  max-width: 100%;
+  margin: 0 0 1em;
+  border-collapse: collapse;
+  &.right { margin-left: auto; }
+  &.center { margin-left: auto; margin-right: auto; }
+  &.left { margin-right: auto; }
+  & .text-left { text-align: left; }
+  & .text-center { text-align: center; }
+  & .text-right { text-align: right; }
+  & caption {
+    margin: 0;
+    padding: 3px 0 3px 1em;
+  }
+  & p { margin: 0; }
+}
+
+thead, tbody {
+  border: 1px solid var(--line-color);
+}
+th, td {
+  text-align: left;
+  vertical-align: top;
+  padding: 5px 10px;
+}
+th {
+  background-color: var(--line-color);
+}
+:is(tr:nth-child(2n), thead+tbody > tr:nth-child(2n+1)) > td {
+  background-color: var(--background-color);
+}
+:is(tr:nth-child(2n+1), thead+tbody > tr:nth-child(2n)) > td {
+  background-color: var(--highlight-color);
+}
+
+/* pilcrow */
+a.pilcrow {
+  margin-left: 3px;
+  opacity: 0.2;
+  user-select: none;
+  &[href] {
+    color: var(--pilcrow-weak);
+    &:hover { text-decoration: none; }
+  }
+  @media not print {
+    :hover > &, &:focus {
+      opacity: 1;
+    }
+    &[href]:hover {
+      color: var(--pilcrow-strong);
+      background-color: transparent;
+    }
+  }
+  @media print {
+    display: none;
+  }
+}
+
+/* misc */
+hr {
+  border: 0;
+  border-top: 1px solid var(--line-color);
+}
+.bcp14 {
+  font-variant: small-caps;
+  font-weight: 600;
+  font-size: var(--small-font-size);
+}
+.role {
+  font-variant: all-small-caps;
+}
+sub, sup {
+  line-height: 1;
+  font-size: 80%;
+}
+
+/* info block */
+#identifiers {
+  margin: 0;
+  font-size: var(--small-font-size);
+  line-height: 18px;
+  --identifier-width: 15ch;
+  & dt {
+    width: var(--identifier-width);
+    min-width: var(--identifier-width);
+    clear: left;
+    float: left;
+    text-align: right;
+    margin-right: 1ch;
+  }
+  & dd {
+    margin: 0;
+    margin-left: calc(1em + var(--identifier-width)) !important;
+    min-width: 5em;
+  }
+  & .authors {
+    & .author {
+      display: inline-block;
+      margin-right: 1.5em;
+    }
+    & .org {
+      font-style: italic;
+    }
+  }
+}
+
+/* The prepared/rendered info at the very bottom of the page */
+.docInfo {
+  color: #999;
+  font-size: 0.9em;
+  font-style: italic;
+  margin-top: 2em;
+  & .prepared {
+    float: right;
+  }
+}
+
+/* table of contents */
+#toc {
+  padding: 0.75em 0 2em 0;
+  margin-bottom: 1em;
+
+  & nav {
+    & ul {
+      margin: 0 0.5em 0 0;
+      padding: 0;
+      list-style: none;
+    }
+    & li {
+      line-height: 1.3em;
+      margin: 2px 0;
+      padding-left: 1.2em;
+      text-indent: -1.2em;
+    }
+  }
+  & a.xref {
+    white-space: normal;
+  }
+}
+
+.references {
+  & > dt {
+    text-align: right;
+    font-weight: bold;
+    min-width: 10ch;
+    margin-right: 1.5ch;
+    &:target::before {
+      content: "⇒";
+      margin: 0 10px 0 -25px;
+    }
+  }
+  & > dd {
+    margin-left: 12ch !important;
+    overflow: visible;
+    & .refInstance {
+      margin-bottom: 0.8em;
+    }
+    & .ascii {
+      margin-bottom: 0.25em;
+    }
+  }
+}
+
+#rfc\.index\.index + ul {
+  margin-left: 0;
+}
+
+/* authors */
+address.vcard {
+  font-style: normal;
+  max-width: 20em;
+  margin: 1em auto 1em 0;
+
+  & .nameRole {
+    font-weight: 700;
+    margin-left: 0;
+  }
+  & .label {
+    margin: 0.5em 0;
+  }
+  & .type {
+    display: none;
+  }
+  & .alternative-contact {
+    margin: 0.5em 0 0.25em 0;
+  }
+  & .non-ascii {
+    margin: 0 0 0 2em;
+  }
+  & div.left {
+    text-align: left;
+  }
+  & div.right {
+    text-align: right;
+  }
+}
+
+hr.addr {
+  border-top: 1px dashed;
+  margin: 0;
+  color: #ddd;
+  max-width: calc(100% - 16px);
+}
+@media (min-width: 500px) {
+  #authors-addresses {
+    & > section {
+      column-count: 2;
+      column-gap: 20px;
+    }
+    & > section > h2 {
+      column-span: all;
+    }
+    /* hack for break-inside: avoid-column */
+    & address {
+      display: inline-block;
+      break-inside: avoid-column;
+    }
+  }
+}
+
+/* Comments */
+.rfcEditorRemove {
+  & p:first-of-type {
+    font-style: italic;
+  }
+}
+.cref {
+  background-color: rgba(249, 232, 105, 0.3);
+  padding: 2px 4px;
+}
+.crefSource {
+  font-style: italic;
+}
+
+@media screen {
+  #toc {
+    & nav {
+      font-family: var(--font-title);
+      font-weight: 360;
+      & > ul { margin-bottom: 2em; }
+      & ul {
+        margin: 0 0 0 4px;
+        & :is(p, li) {
+          margin: 2px 0;
+        }
+      }
+    }
+    & a.toplink {
+      float: right;
+    }
+  }
+}
+@media not screen {
+  #toc a.toplink {
+    display: none;
+  }
+}
+
+
+/* TOC layout for smaller screens */
+@media screen and (max-width: 929px) {
+  #toc {
+    position: fixed;
+    z-index: 2;
+    top: 0;
+    right: 0;
+    padding: 1px 0 0 0;
+    margin: 0;
+    border-bottom: 1px solid #ccc;
+    opacity: 0.6;
+    & h2 {
+      margin: 0;
+      padding: 2px 0 2px 6px;
+      padding-right: 1em;
+      font-size: 18px;
+      line-height: 24px;
+      min-width: 190px;
+      text-align: right;
+      background-color: #444;
+      color: white;
+      cursor: pointer;
+      &::before { /* css hamburger */
+        float: right;
+        position: relative;
+        width: 1em;
+        height: 1px;
+        left: -164px;
+        margin: 8px 0 0 0;
+        background: white none repeat scroll 0 0;
+        box-shadow: 0 4px 0 0 white, 0 8px 0 0 white;
+        content: "";
+      }
+    }
+    & nav {
+      display: none;
+      background-color: var(--background-color);
+      padding: 0.5em 1em 1em;
+      overflow: auto;
+      overscroll-behavior: contain;
+      height: calc(100vh - 48px);
+      border-left: 1px solid #ddd;
+    }
+    &.active {
+      opacity: 1;
+      & nav { display: block; }
+    }
+    /* Make the collapsed ToC header render white on gray also when it's a link */
+    & h2 a,
+    & h2 a:is(:link, :focus, :hover),
+    & a.toplink,
+    & a.toplink:hover {
+      color: white;
+      background-color: #444;
+      text-decoration: none;
+    }
+    & a.toplink {
+      margin: 2px 0.5em 0;
+    }
+  }
+}
+
+/* TOC layout for wide screens */
+@media screen and (min-width: 930px) {
+  body {
+    padding-right: 360px;
+    padding-right: calc(min(180px + 20%, 500px));
+  }
+  #toc {
+    position: fixed;
+    bottom: 0;
+    right: 0;
+    right: calc(50vw - 480px);
+    width: 312px;
+    margin: 0;
+    padding: 0;
+    z-index: 1;
+    & h2 {
+      margin: 0;
+      padding: 0.25em 1em 1em 0;
+    }
+    & nav {
+      display: block;
+      height: calc(90vh - 84px);
+      bottom: 0;
+      padding: 0.5em 0 2em;
+      overflow: auto;
+      overscroll-behavior: contain;
+      scrollbar-width: thin;
+    }
+    & a.toplink {
+      margin: 8px 0.5em 0;
+    }
+  }
+  img { /* future proofing */
+    max-width: 100%;
+    height: auto;
+  }
+}
+
+/* pagination */
+@media print {
+  body {
+    width: 100%;
+  }
+  p {
+    orphans: 3;
+    widows: 3;
+  }
+  #n-copyright-notice {
+    border-bottom: none;
+  }
+  #toc {
+    page-break-before: always;
+    border-top: none;
+    padding-top: 0;
+  }
+  #n-introduction {
+    page-break-before: always;
+  }
+  figure, pre, .vcard {
+    page-break-inside: avoid;
+  }
+  h1, h2, h3, h4, h5, h6 {
+    page-break-after: avoid;
+  }
+  :is(h2, h3, h4, h5, h6)+*, dd {
+    page-break-before: avoid;
+  }
+  pre {
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    font-size: 10pt;
+  }
+  table {
+    border: 1px solid #ddd;
+  }
+  td {
+    border-top: 1px solid #ddd;
+  }
+}
+
+@page :first {
+  padding-top: 0;
+  @top-left {
+    content: normal;
+    border: none;
+  }
+  @top-center {
+    content: normal;
+    border: none;
+  }
+  @top-right {
+    content: normal;
+    border: none;
+  }
+}
+
+@page {
+  size: A4;
+  margin-bottom: 45mm;
+  padding-top: 20px;
+}
+
+/* Dark mode. */
+@media (prefers-color-scheme: dark) {
+:root {
+  --background-color: #121212;
+  --text-color: #f0f0f0;
+  --title-color: #fff;
+  --link-color: #4da4f0;
+  --highlight-color: #282828;
+  --line-color: #444;
+  --pilcrow-weak: #444;
+  --pilcrow-strong: #666;
+  scrollbar-color: #777 #333;
+}
+}
+
+/* SVG Trick: a prefix match works because only black and white are allowed */
+svg {
+  & :is([stroke="black"], [stroke^="#000"]) {
+    stroke: var(--text-color);
+  }
+  & :is([stroke="white"], [stroke^="#fff"]) {
+    stroke: var(--background-color);
+  }
+  & :is([fill="black"], [fill^="#000"], :not([fill], [fill] *)) {
+    fill: var(--text-color);
+  }
+  & :is([fill="white"], [fill^="#fff"]) {
+    fill: var(--background-color);
+  }
+}
+</style>
+
+</head>
+<body class="xml2rfc">
+<table class="ears">
+<thead><tr>
+<td class="left">Internet-Draft</td>
+<td class="center">WIMSE Fast HTTPSig</td>
+<td class="right">November 2026</td>
+</tr></thead>
+<tfoot><tr>
+<td class="left">Sheffer &amp; Salowey</td>
+<td class="center">Expires 31 May 2027</td>
+<td class="right">[Page]</td>
+</tr></tfoot>
+</table>
+<div id="external-metadata" class="document-information"></div>
+<div id="internal-metadata" class="document-information">
+<dl id="identifiers">
+<dt class="label-workgroup">Workgroup:</dt>
+<dd class="workgroup">Workload Identity in Multi System Environments</dd>
+<dt class="label-internet-draft">Internet-Draft:</dt>
+<dd class="internet-draft">draft-sheffer-wimse-fast-httpsig-latest</dd>
+<dt class="label-published">Published:</dt>
+<dd class="published">
+<time datetime="2026-11-27" class="published">27 November 2026</time>
+    </dd>
+<dt class="label-intended-status">Intended Status:</dt>
+<dd class="intended-status">Standards Track</dd>
+<dt class="label-expires">Expires:</dt>
+<dd class="expires"><time datetime="2027-05-31">31 May 2027</time></dd>
+<dt class="label-authors">Authors:</dt>
+<dd class="authors">
+<div class="author">
+      <div class="author-name">Y. Sheffer</div>
+<div class="org">Independent</div>
+</div>
+<div class="author">
+      <div class="author-name">J. Salowey</div>
+<div class="org">Palo Alto Networks</div>
+</div>
+</dd>
+</dl>
+</div>
+<h1 id="title">Fast HTTP Message Signatures for WIMSE</h1>
+<section id="section-abstract">
+      <h2 id="abstract"><a href="#abstract" class="selfRef">Abstract</a></h2>
+<p id="section-abstract-1">The WIMSE HTTP Message Signatures profile authenticates each HTTP request
+with a Workload Identity Token (WIT) and an asymmetric signature.
+Carrying and validating the WIT dominates that cost.
+This document defines an optional extension that reduces that cost:
+peers run a short handshake to establish shared MAC keys, then authenticate
+later requests and responses between the same workloads without the WIT.<a href="#section-abstract-1" class="pilcrow">¶</a></p>
+</section>
+<section class="note rfcEditorRemove" id="section-note.1">
+      <h2 id="name-about-this-document">
+<a href="#name-about-this-document" class="section-name selfRef">About This Document</a>
+      </h2>
+<p id="section-note.1-1">This note is to be removed before publishing as an RFC.<a href="#section-note.1-1" class="pilcrow">¶</a></p>
+<p id="section-note.1-2">
+        The latest revision of this draft can be found at <span><a href="https://yaronf.github.io/draft-sheffer-wimse-fast-httpsig/draft-sheffer-wimse-fast-httpsig.html">https://yaronf.github.io/draft-sheffer-wimse-fast-httpsig/draft-sheffer-wimse-fast-httpsig.html</a></span>.
+        Status information for this document may be found at <span><a href="https://datatracker.ietf.org/doc/draft-sheffer-wimse-fast-httpsig/">https://datatracker.ietf.org/doc/draft-sheffer-wimse-fast-httpsig/</a></span>.<a href="#section-note.1-2" class="pilcrow">¶</a></p>
+<p id="section-note.1-3">
+        Discussion of this document takes place on the
+        Workload Identity in Multi System Environments Working Group mailing list (<span><a href="mailto:wimse@ietf.org">mailto:wimse@ietf.org</a></span>),
+        which is archived at <span><a href="https://mailarchive.ietf.org/arch/browse/wimse/">https://mailarchive.ietf.org/arch/browse/wimse/</a></span>.
+        Subscribe at <span><a href="https://www.ietf.org/mailman/listinfo/wimse/">https://www.ietf.org/mailman/listinfo/wimse/</a></span>.<a href="#section-note.1-3" class="pilcrow">¶</a></p>
+<p id="section-note.1-4">Source for this draft and an issue tracker can be found at
+        <span><a href="https://github.com/yaronf/draft-sheffer-wimse-fast-httpsig">https://github.com/yaronf/draft-sheffer-wimse-fast-httpsig</a></span>.<a href="#section-note.1-4" class="pilcrow">¶</a></p>
+</section>
+<div id="status-of-memo">
+<section id="section-boilerplate.1">
+        <h2 id="name-status-of-this-memo">
+<a href="#name-status-of-this-memo" class="section-name selfRef">Status of This Memo</a>
+        </h2>
+<p id="section-boilerplate.1-1">
+        This Internet-Draft is submitted in full conformance with the
+        provisions of BCP 78 and BCP 79.<a href="#section-boilerplate.1-1" class="pilcrow">¶</a></p>
+<p id="section-boilerplate.1-2">
+        Internet-Drafts are working documents of the Internet Engineering Task
+        Force (IETF). Note that other groups may also distribute working
+        documents as Internet-Drafts. The list of current Internet-Drafts is
+        at <span><a href="https://datatracker.ietf.org/drafts/current/">https://datatracker.ietf.org/drafts/current/</a></span>.<a href="#section-boilerplate.1-2" class="pilcrow">¶</a></p>
+<p id="section-boilerplate.1-3">
+        Internet-Drafts are draft documents valid for a maximum of six months
+        and may be updated, replaced, or obsoleted by other documents at any
+        time. It is inappropriate to use Internet-Drafts as reference
+        material or to cite them other than as "work in progress."<a href="#section-boilerplate.1-3" class="pilcrow">¶</a></p>
+<p id="section-boilerplate.1-4">
+        This Internet-Draft will expire on 31 May 2027.<a href="#section-boilerplate.1-4" class="pilcrow">¶</a></p>
+</section>
+</div>
+<div id="copyright">
+<section id="section-boilerplate.2">
+        <h2 id="name-copyright-notice">
+<a href="#name-copyright-notice" class="section-name selfRef">Copyright Notice</a>
+        </h2>
+<p id="section-boilerplate.2-1">
+            Copyright (c) 2026 IETF Trust and the persons identified as the
+            document authors. All rights reserved.<a href="#section-boilerplate.2-1" class="pilcrow">¶</a></p>
+<p id="section-boilerplate.2-2">
+            This document is subject to BCP 78 and the IETF Trust's Legal
+            Provisions Relating to IETF Documents
+            (<span><a href="https://trustee.ietf.org/license-info">https://trustee.ietf.org/license-info</a></span>) in effect on the date of
+            publication of this document. Please review these documents
+            carefully, as they describe your rights and restrictions with
+            respect to this document. Code Components extracted from this
+            document must include Revised BSD License text as described in
+            Section 4.e of the Trust Legal Provisions and are provided without
+            warranty as described in the Revised BSD License.<a href="#section-boilerplate.2-2" class="pilcrow">¶</a></p>
+</section>
+</div>
+<div id="toc">
+<section id="section-toc.1">
+        <a href="#" onclick="scroll(0,0)" class="toplink">▲</a><h2 id="name-table-of-contents">
+<a href="#name-table-of-contents" class="section-name selfRef">Table of Contents</a>
+        </h2>
+<nav class="toc"><ul class="compact toc ulBare ulEmpty">
+<li class="compact toc ulBare ulEmpty" id="section-toc.1-1.1">
+            <p id="section-toc.1-1.1.1" class="keepWithNext"><a href="#section-1" class="auto internal xref">1</a>.  <a href="#name-introduction" class="internal xref">Introduction</a></p>
+</li>
+          <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.2">
+            <p id="section-toc.1-1.2.1" class="keepWithNext"><a href="#section-2" class="auto internal xref">2</a>.  <a href="#name-conventions-and-definitions" class="internal xref">Conventions and Definitions</a></p>
+</li>
+          <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.3">
+            <p id="section-toc.1-1.3.1" class="keepWithNext"><a href="#section-3" class="auto internal xref">3</a>.  <a href="#name-overview" class="internal xref">Overview</a></p>
+</li>
+          <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.4">
+            <p id="section-toc.1-1.4.1"><a href="#section-4" class="auto internal xref">4</a>.  <a href="#name-handshake" class="internal xref">Handshake</a></p>
+<ul class="compact toc ulBare ulEmpty">
+<li class="compact toc ulBare ulEmpty" id="section-toc.1-1.4.2.1">
+                <p id="section-toc.1-1.4.2.1.1"><a href="#section-4.1" class="auto internal xref">4.1</a>.  <a href="#name-key-establishment" class="internal xref">Key Establishment</a></p>
+</li>
+              <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.4.2.2">
+                <p id="section-toc.1-1.4.2.2.1"><a href="#section-4.2" class="auto internal xref">4.2</a>.  <a href="#name-suite-selection" class="internal xref">Suite Selection</a></p>
+</li>
+            </ul>
+</li>
+          <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.5">
+            <p id="section-toc.1-1.5.1"><a href="#section-5" class="auto internal xref">5</a>.  <a href="#name-key-export" class="internal xref">Key Export</a></p>
+</li>
+          <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.6">
+            <p id="section-toc.1-1.6.1"><a href="#section-6" class="auto internal xref">6</a>.  <a href="#name-session-messages" class="internal xref">Session Messages</a></p>
+</li>
+          <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.7">
+            <p id="section-toc.1-1.7.1"><a href="#section-7" class="auto internal xref">7</a>.  <a href="#name-session-lifetime" class="internal xref">Session Lifetime</a></p>
+</li>
+          <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.8">
+            <p id="section-toc.1-1.8.1"><a href="#section-8" class="auto internal xref">8</a>.  <a href="#name-tickets" class="internal xref">Tickets</a></p>
+</li>
+          <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.9">
+            <p id="section-toc.1-1.9.1"><a href="#section-9" class="auto internal xref">9</a>.  <a href="#name-negotiating-the-extension" class="internal xref">Negotiating the Extension</a></p>
+</li>
+          <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.10">
+            <p id="section-toc.1-1.10.1"><a href="#section-10" class="auto internal xref">10</a>. <a href="#name-examples" class="internal xref">Examples</a></p>
+</li>
+          <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.11">
+            <p id="section-toc.1-1.11.1"><a href="#section-11" class="auto internal xref">11</a>. <a href="#name-security-considerations" class="internal xref">Security Considerations</a></p>
+</li>
+          <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.12">
+            <p id="section-toc.1-1.12.1"><a href="#section-12" class="auto internal xref">12</a>. <a href="#name-iana-considerations" class="internal xref">IANA Considerations</a></p>
+<ul class="compact toc ulBare ulEmpty">
+<li class="compact toc ulBare ulEmpty" id="section-toc.1-1.12.2.1">
+                <p id="section-toc.1-1.12.2.1.1"><a href="#section-12.1" class="auto internal xref">12.1</a>.  <a href="#name-http-signature-metadata-par" class="internal xref">HTTP Signature Metadata Parameters</a></p>
+<ul class="compact toc ulBare ulEmpty">
+<li class="compact toc ulBare ulEmpty" id="section-toc.1-1.12.2.1.2.1">
+                    <p id="section-toc.1-1.12.2.1.2.1.1"><a href="#section-12.1.1" class="auto internal xref">12.1.1</a>.  <a href="#name-wimse-kem-suite" class="internal xref"><code>wimse-kem-suite</code></a></p>
+</li>
+                  <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.12.2.1.2.2">
+                    <p id="section-toc.1-1.12.2.1.2.2.1"><a href="#section-12.1.2" class="auto internal xref">12.1.2</a>.  <a href="#name-wimse-kem" class="internal xref"><code>wimse-kem</code></a></p>
+</li>
+                  <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.12.2.1.2.3">
+                    <p id="section-toc.1-1.12.2.1.2.3.1"><a href="#section-12.1.3" class="auto internal xref">12.1.3</a>.  <a href="#name-wimse-session-id" class="internal xref"><code>wimse-session-id</code></a></p>
+</li>
+                  <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.12.2.1.2.4">
+                    <p id="section-toc.1-1.12.2.1.2.4.1"><a href="#section-12.1.4" class="auto internal xref">12.1.4</a>.  <a href="#name-wimse-ticket-client" class="internal xref"><code>wimse-ticket-client</code></a></p>
+</li>
+                  <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.12.2.1.2.5">
+                    <p id="section-toc.1-1.12.2.1.2.5.1"><a href="#section-12.1.5" class="auto internal xref">12.1.5</a>.  <a href="#name-wimse-ticket-server" class="internal xref"><code>wimse-ticket-server</code></a></p>
+</li>
+                </ul>
+</li>
+            </ul>
+</li>
+          <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.13">
+            <p id="section-toc.1-1.13.1"><a href="#section-13" class="auto internal xref">13</a>. <a href="#name-open-issues" class="internal xref">Open Issues</a></p>
+</li>
+          <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.14">
+            <p id="section-toc.1-1.14.1"><a href="#section-14" class="auto internal xref">14</a>. <a href="#name-references" class="internal xref">References</a></p>
+<ul class="compact toc ulBare ulEmpty">
+<li class="compact toc ulBare ulEmpty" id="section-toc.1-1.14.2.1">
+                <p id="section-toc.1-1.14.2.1.1"><a href="#section-14.1" class="auto internal xref">14.1</a>.  <a href="#name-normative-references" class="internal xref">Normative References</a></p>
+</li>
+              <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.14.2.2">
+                <p id="section-toc.1-1.14.2.2.1"><a href="#section-14.2" class="auto internal xref">14.2</a>.  <a href="#name-informative-references" class="internal xref">Informative References</a></p>
+</li>
+            </ul>
+</li>
+          <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.15">
+            <p id="section-toc.1-1.15.1"><a href="#appendix-A" class="auto internal xref">Appendix A</a>.  <a href="#name-document-history" class="internal xref">Document History</a></p>
+<ul class="compact toc ulBare ulEmpty">
+<li class="compact toc ulBare ulEmpty" id="section-toc.1-1.15.2.1">
+                <p id="section-toc.1-1.15.2.1.1"><a href="#appendix-A.1" class="auto internal xref">A.1</a>.  <a href="#name-draft-sheffer-wimse-fast-ht" class="internal xref">draft-sheffer-wimse-fast-httpsig-00</a></p>
+</li>
+            </ul>
+</li>
+          <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.16">
+            <p id="section-toc.1-1.16.1"><a href="#appendix-B" class="auto internal xref"></a><a href="#name-acknowledgments" class="internal xref">Acknowledgments</a></p>
+</li>
+          <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.17">
+            <p id="section-toc.1-1.17.1"><a href="#appendix-C" class="auto internal xref"></a><a href="#name-authors-addresses" class="internal xref">Authors' Addresses</a></p>
+</li>
+        </ul>
+</nav>
+</section>
+</div>
+<div id="introduction">
+<section id="section-1">
+      <h2 id="name-introduction">
+<a href="#section-1" class="section-number selfRef">1. </a><a href="#name-introduction" class="section-name selfRef">Introduction</a>
+      </h2>
+<p id="section-1-1"><span>[<a href="#I-D.ietf-wimse-http-signature" class="cite xref">I-D.ietf-wimse-http-signature</a>]</span> protects each HTTP message with a WIT
+<span>[<a href="#I-D.ietf-wimse-workload-creds" class="cite xref">I-D.ietf-wimse-workload-creds</a>]</span> and a signature under the private key associated with the WIT.
+The WIT is large relative to typical service requests.
+Asymmetric verification is secondary to that byte and parsing cost.<a href="#section-1-1" class="pilcrow">¶</a></p>
+<p id="section-1-2">This document defines an optional extension of that profile.
+The peers run one WIT-authenticated request/response exchange that also
+performs an ephemeral key establishment.
+Later messages in the same session are authenticated with HTTP Message Signatures
+<span>[<a href="#RFC9421" class="cite xref">RFC9421</a>]</span> using <code>hmac-sha256</code> and an HPKE-exported session identifier,
+optionally with compact tickets.
+The WIT is omitted from those messages.<a href="#section-1-2" class="pilcrow">¶</a></p>
+<p id="section-1-3">Goals:<a href="#section-1-3" class="pilcrow">¶</a></p>
+<ul class="normal">
+<li class="normal" id="section-1-4.1">
+          <p id="section-1-4.1.1">Amortize WIT carriage and asymmetric signature and verification over many
+calls between the same workloads.<a href="#section-1-4.1.1" class="pilcrow">¶</a></p>
+</li>
+        <li class="normal" id="section-1-4.2">
+          <p id="section-1-4.2.1">Extend the base profile; remain verifiable across TLS-terminating intermediaries, as in the base profile.<a href="#section-1-4.2.1" class="pilcrow">¶</a></p>
+</li>
+        <li class="normal" id="section-1-4.3">
+          <p id="section-1-4.3.1">Select a classical or post-quantum HPKE ciphersuite from the client's WIT signature
+algorithm without changing the message layout.<a href="#section-1-4.3.1" class="pilcrow">¶</a></p>
+</li>
+      </ul>
+</section>
+</div>
+<div id="conventions-and-definitions">
+<section id="section-2">
+      <h2 id="name-conventions-and-definitions">
+<a href="#section-2" class="section-number selfRef">2. </a><a href="#name-conventions-and-definitions" class="section-name selfRef">Conventions and Definitions</a>
+      </h2>
+<p id="section-2-1">Terminology follows <span>[<a href="#I-D.ietf-wimse-arch" class="cite xref">I-D.ietf-wimse-arch</a>]</span> and <span>[<a href="#I-D.ietf-wimse-http-signature" class="cite xref">I-D.ietf-wimse-http-signature</a>]</span>.<a href="#section-2-1" class="pilcrow">¶</a></p>
+<p id="section-2-2">The key words "<span class="bcp14">MUST</span>", "<span class="bcp14">MUST NOT</span>", "<span class="bcp14">REQUIRED</span>", "<span class="bcp14">SHALL</span>", "<span class="bcp14">SHALL NOT</span>", "<span class="bcp14">SHOULD</span>", "<span class="bcp14">SHOULD NOT</span>", "<span class="bcp14">RECOMMENDED</span>", "<span class="bcp14">NOT RECOMMENDED</span>",
+"<span class="bcp14">MAY</span>", and "<span class="bcp14">OPTIONAL</span>" in this document are to be interpreted as
+described in BCP 14 <span>[<a href="#RFC2119" class="cite xref">RFC2119</a>]</span> <span>[<a href="#RFC8174" class="cite xref">RFC8174</a>]</span> when, and only when, they
+appear in all capitals, as shown here.<a href="#section-2-2" class="pilcrow">¶</a></p>
+</section>
+</div>
+<div id="overview">
+<section id="section-3">
+      <h2 id="name-overview">
+<a href="#section-3" class="section-number selfRef">3. </a><a href="#name-overview" class="section-name selfRef">Overview</a>
+      </h2>
+<p id="section-3-1">A session begins with one handshake request and its handshake response,
+both signed under the base profile.
+The peers run HPKE <span>[<a href="#RFC9180" class="cite xref">RFC9180</a>]</span> in Base mode and use only the Export interface:
+the client is the HPKE recipient and sends an ephemeral recipient public key;
+the server is the HPKE sender and returns the encapsulated key <code>enc</code>.
+Both values are opaque <code>wimse-kem</code> byte sequences.
+Both sides export two MAC keys (one per direction) and a session identifier from
+the HPKE context.
+The server <span class="bcp14">MAY</span> issue an opaque ticket on the handshake response.
+The client <span class="bcp14">MAY</span> issue an opaque ticket on its first session request, after key export;
+see <a href="#ticket" class="auto internal xref">Section 8</a>.
+The client confirms possession of the exported keys by MACing its next request.
+Further requests and responses use <code>hmac-sha256</code> and carry the session identifier;
+when tickets were issued, they carry those ticket parameters as well.
+There is no session rehandshake: when the session ends, the peers start a new handshake.
+A pair of workloads <span class="bcp14">MAY</span> hold concurrent sessions; the session identifier distinguishes them.<a href="#section-3-1" class="pilcrow">¶</a></p>
+</section>
+</div>
+<div id="handshake">
+<section id="section-4">
+      <h2 id="name-handshake">
+<a href="#section-4" class="section-number selfRef">4. </a><a href="#name-handshake" class="section-name selfRef">Handshake</a>
+      </h2>
+<p id="section-4-1">The handshake request and response <span class="bcp14">MUST</span> otherwise conform to <span>[<a href="#I-D.ietf-wimse-http-signature" class="cite xref">I-D.ietf-wimse-http-signature</a>]</span>,
+including WIT validation and the <code>wimse-workload-to-workload</code> tag.
+The handshake response <span class="bcp14">MUST</span> be signed.
+Clients that require this extension <span class="bcp14">MUST</span> include <code>wimse-sign-response</code> on the handshake request.<a href="#section-4-1" class="pilcrow">¶</a></p>
+<div id="key-establishment">
+<section id="section-4.1">
+        <h3 id="name-key-establishment">
+<a href="#section-4.1" class="section-number selfRef">4.1. </a><a href="#name-key-establishment" class="section-name selfRef">Key Establishment</a>
+        </h3>
+<p id="section-4.1-1">The handshake uses HPKE <span>[<a href="#RFC9180" class="cite xref">RFC9180</a>]</span> in Base mode
+(<span><a href="https://rfc-editor.org/rfc/rfc9180#section-5.1.1" class="relref">Section 5.1.1</a> of [<a href="#RFC9180" class="cite xref">RFC9180</a>]</span>) and obtains session secrets only through the Export
+interface (<span><a href="https://rfc-editor.org/rfc/rfc9180#section-5.3" class="relref">Section 5.3</a> of [<a href="#RFC9180" class="cite xref">RFC9180</a>]</span>).<a href="#section-4.1-1" class="pilcrow">¶</a></p>
+<p id="section-4.1-2">An HPKE ciphersuite is the triple <code>(kem_id, kdf_id, aead_id)</code> of two-octet identifiers
+from <span>[<a href="#RFC9180" class="cite xref">RFC9180</a>]</span> and <span>[<a href="#I-D.ietf-hpke-pq" class="cite xref">I-D.ietf-hpke-pq</a>]</span>.
+On the wire, that triple is the six-octet sequence
+<code>I2OSP(kem_id, 2) || I2OSP(kdf_id, 2) || I2OSP(aead_id, 2)</code>
+(<span><a href="https://rfc-editor.org/rfc/rfc9180#section-4" class="relref">Section 4</a> of [<a href="#RFC9180" class="cite xref">RFC9180</a>]</span>, big-endian).<a href="#section-4.1-2" class="pilcrow">¶</a></p>
+<p id="section-4.1-3">This document defines two ciphersuites.
+Both use <code>kdf_id</code> = <code>0x0001</code> (HKDF-SHA256) and <code>aead_id</code> = <code>0xFFFF</code> (Export-Only)
+(<span><a href="https://rfc-editor.org/rfc/rfc9180#section-7.3" class="relref">Section 7.3</a> of [<a href="#RFC9180" class="cite xref">RFC9180</a>]</span>).<a href="#section-4.1-3" class="pilcrow">¶</a></p>
+<p id="section-4.1-4">The classical ciphersuite is:<a href="#section-4.1-4" class="pilcrow">¶</a></p>
+<ul class="normal">
+<li class="normal" id="section-4.1-5.1">
+            <p id="section-4.1-5.1.1"><code>kem_id</code> = <code>0x0010</code> (DHKEM(P-256, HKDF-SHA256)),<a href="#section-4.1-5.1.1" class="pilcrow">¶</a></p>
+</li>
+          <li class="normal" id="section-4.1-5.2">
+            <p id="section-4.1-5.2.1">wire value <code>0x00 0x10 0x00 0x01 0xFF 0xFF</code>.<a href="#section-4.1-5.2.1" class="pilcrow">¶</a></p>
+</li>
+        </ul>
+<p id="section-4.1-6">The post-quantum ciphersuite is:<a href="#section-4.1-6" class="pilcrow">¶</a></p>
+<ul class="normal">
+<li class="normal" id="section-4.1-7.1">
+            <p id="section-4.1-7.1.1"><code>kem_id</code> = <code>0x0041</code> (ML-KEM-768) <span>[<a href="#I-D.ietf-hpke-pq" class="cite xref">I-D.ietf-hpke-pq</a>]</span>,<a href="#section-4.1-7.1.1" class="pilcrow">¶</a></p>
+</li>
+          <li class="normal" id="section-4.1-7.2">
+            <p id="section-4.1-7.2.1">wire value <code>0x00 0x41 0x00 0x01 0xFF 0xFF</code>.<a href="#section-4.1-7.2.1" class="pilcrow">¶</a></p>
+</li>
+        </ul>
+<p id="section-4.1-8">Implementations <span class="bcp14">MUST</span> implement the classical ciphersuite.
+Implementations of this extension that accept ML-DSA WIT algorithms
+(<span>[<a href="#RFC9964" class="cite xref">RFC9964</a>]</span>) <span class="bcp14">MUST</span> also implement the post-quantum ciphersuite.
+Other ciphersuites are not defined by this document; the parameters below are designed so a
+later document can add them without changing message layout.<a href="#section-4.1-8" class="pilcrow">¶</a></p>
+<p id="section-4.1-9">Suite selection is specified in <a href="#suite-selection" class="auto internal xref">Section 4.2</a>.<a href="#section-4.1-9" class="pilcrow">¶</a></p>
+<p id="section-4.1-10">Both sides use the same HPKE <code>info</code> value:<a href="#section-4.1-10" class="pilcrow">¶</a></p>
+<div class="alignLeft art-text artwork" id="section-4.1-11">
+<pre>
+info = "wimse-httpsig-session" || 0x00 ||
+       suite || 0x00 ||
+       req_nonce || 0x00 || resp_nonce || 0x00 ||
+       SHA-256(client_WIT) ||
+       SHA-256(server_WIT)
+</pre><a href="#section-4.1-11" class="pilcrow">¶</a>
+</div>
+<p id="section-4.1-12">where:<a href="#section-4.1-12" class="pilcrow">¶</a></p>
+<ul class="normal">
+<li class="normal" id="section-4.1-13.1">
+            <p id="section-4.1-13.1.1"><code>suite</code> is the six-octet ciphersuite value from <code>wimse-kem-suite</code>.<a href="#section-4.1-13.1.1" class="pilcrow">¶</a></p>
+</li>
+          <li class="normal" id="section-4.1-13.2">
+            <p id="section-4.1-13.2.1"><code>req_nonce</code> / <code>resp_nonce</code> are the parsed handshake <code>nonce</code> values
+(<span><a href="https://rfc-editor.org/rfc/rfc9421#section-2.3" class="relref">Section 2.3</a> of [<a href="#RFC9421" class="cite xref">RFC9421</a>]</span>) as UTF-8 octets and without the surrounding quotes.<a href="#section-4.1-13.2.1" class="pilcrow">¶</a></p>
+</li>
+          <li class="normal" id="section-4.1-13.3">
+            <p id="section-4.1-13.3.1"><code>client_WIT</code> / <code>server_WIT</code> are the handshake request and response
+<code>Workload-Identity-Token</code> header field values (JWTs), as ASCII octets.<a href="#section-4.1-13.3.1" class="pilcrow">¶</a></p>
+</li>
+          <li class="normal" id="section-4.1-13.4">
+            <p id="section-4.1-13.4.1"><code>SHA-256(...)</code> denotes the 32-octet SHA-256 hash of those octets.<a href="#section-4.1-13.4.1" class="pilcrow">¶</a></p>
+</li>
+        </ul>
+<p id="section-4.1-14">The server constructs <code>info</code> when creating the handshake response (it chooses
+<code>resp_nonce</code> and knows both WIT values).
+The client constructs the same <code>info</code> after receiving that response.<a href="#section-4.1-14" class="pilcrow">¶</a></p>
+<p id="section-4.1-15">The client is the HPKE recipient and the server is the HPKE sender:<a href="#section-4.1-15" class="pilcrow">¶</a></p>
+<ul class="normal">
+<li class="normal" id="section-4.1-16.1">
+            <p id="section-4.1-16.1.1">The client runs <code>GenerateKeyPair()</code> and obtains a recipient key pair <code>(skR, pkR)</code>.<a href="#section-4.1-16.1.1" class="pilcrow">¶</a></p>
+</li>
+          <li class="normal" id="section-4.1-16.2">
+            <p id="section-4.1-16.2.1">When generating the handshake response, the server runs <code>SetupBaseS(pkR, info)</code>,
+which returns <code>(enc, context_S)</code>.<a href="#section-4.1-16.2.1" class="pilcrow">¶</a></p>
+</li>
+          <li class="normal" id="section-4.1-16.3">
+            <p id="section-4.1-16.3.1">After receiving that response, the client runs <code>SetupBaseR(enc, skR, info)</code> and
+obtains <code>context_R</code>.<a href="#section-4.1-16.3.1" class="pilcrow">¶</a></p>
+</li>
+          <li class="normal" id="section-4.1-16.4">
+            <p id="section-4.1-16.4.1">Both sides export session secrets from their context as specified in <a href="#key-derivation" class="auto internal xref">Section 5</a>.<a href="#section-4.1-16.4.1" class="pilcrow">¶</a></p>
+</li>
+        </ul>
+<p id="section-4.1-17">Public keys and <code>enc</code> are encoded as specified by the selected HPKE KEM.
+Peers <span class="bcp14">MUST</span> validate KEM public-key inputs as required by the selected HPKE KEM
+before <code>SetupBaseS</code> or <code>SetupBaseR</code>.
+For the classical ciphersuite, that validation is <span><a href="https://rfc-editor.org/rfc/rfc9180#section-7.1.4" class="relref">Section 7.1.4</a> of [<a href="#RFC9180" class="cite xref">RFC9180</a>]</span>.
+For the post-quantum ciphersuite, that validation is <span>[<a href="#I-D.ietf-hpke-pq" class="cite xref">I-D.ietf-hpke-pq</a>]</span>.<a href="#section-4.1-17" class="pilcrow">¶</a></p>
+<p id="section-4.1-18">The handshake request <span class="bcp14">MUST</span> include the signature parameters:<a href="#section-4.1-18" class="pilcrow">¶</a></p>
+<ul class="normal">
+<li class="normal" id="section-4.1-19.1">
+            <p id="section-4.1-19.1.1"><code>wimse-kem-suite</code>: Byte Sequence; <span class="bcp14">MUST</span> be the six-octet wire value of the
+ciphersuite selected in <a href="#suite-selection" class="auto internal xref">Section 4.2</a>.<a href="#section-4.1-19.1.1" class="pilcrow">¶</a></p>
+</li>
+          <li class="normal" id="section-4.1-19.2">
+            <p id="section-4.1-19.2.1"><code>wimse-kem</code>: Byte Sequence; the serialized recipient public key <code>pkR</code>.<a href="#section-4.1-19.2.1" class="pilcrow">¶</a></p>
+</li>
+        </ul>
+<p id="section-4.1-20">The handshake request <span class="bcp14">MUST NOT</span> include <code>wimse-ticket-client</code> or <code>wimse-ticket-server</code>.<a href="#section-4.1-20" class="pilcrow">¶</a></p>
+<p id="section-4.1-21">The handshake response <span class="bcp14">MUST</span> include:<a href="#section-4.1-21" class="pilcrow">¶</a></p>
+<ul class="normal">
+<li class="normal" id="section-4.1-22.1">
+            <p id="section-4.1-22.1.1"><code>wimse-kem-suite</code>: Byte Sequence; <span class="bcp14">MUST</span> equal the request's <code>wimse-kem-suite</code>.<a href="#section-4.1-22.1.1" class="pilcrow">¶</a></p>
+</li>
+          <li class="normal" id="section-4.1-22.2">
+            <p id="section-4.1-22.2.1"><code>wimse-kem</code>: Byte Sequence; <code>enc</code> from <code>SetupBaseS(pkR, info)</code>.<a href="#section-4.1-22.2.1" class="pilcrow">¶</a></p>
+</li>
+        </ul>
+<p id="section-4.1-23">The handshake response <span class="bcp14">MAY</span> also include <code>wimse-ticket-server</code>; see <a href="#ticket" class="auto internal xref">Section 8</a>.
+The handshake response <span class="bcp14">MUST NOT</span> include <code>wimse-ticket-client</code>.<a href="#section-4.1-23" class="pilcrow">¶</a></p>
+<p id="section-4.1-24">Those parameters are covered by <code>@signature-params</code> as usual for <span>[<a href="#RFC9421" class="cite xref">RFC9421</a>]</span>.
+The private key associated with the WIT is used only to sign.
+It <span class="bcp14">MUST NOT</span> be used as an HPKE recipient key.<a href="#section-4.1-24" class="pilcrow">¶</a></p>
+</section>
+</div>
+<div id="suite-selection">
+<section id="section-4.2">
+        <h3 id="name-suite-selection">
+<a href="#section-4.2" class="section-number selfRef">4.2. </a><a href="#name-suite-selection" class="section-name selfRef">Suite Selection</a>
+        </h3>
+<p id="section-4.2-1">The HTTP message signature algorithm on the handshake request is the <code>alg</code> member of
+the <code>cnf.jwk</code> object in the client's WIT
+(<span><a href="https://datatracker.ietf.org/doc/html/draft-ietf-wimse-http-signature-09#section-3.1" class="relref">Section 3.1</a> of [<a href="#I-D.ietf-wimse-http-signature" class="cite xref">I-D.ietf-wimse-http-signature</a>]</span>).
+The client selects the HPKE ciphersuite from that algorithm as follows:<a href="#section-4.2-1" class="pilcrow">¶</a></p>
+<ul class="normal">
+<li class="normal" id="section-4.2-2.1">
+            <p id="section-4.2-2.1.1">If <code>cnf.jwk.alg</code> is <code>ML-DSA-44</code>, <code>ML-DSA-65</code>, or <code>ML-DSA-87</code> <span>[<a href="#RFC9964" class="cite xref">RFC9964</a>]</span>,
+the client <span class="bcp14">MUST</span> use the post-quantum ciphersuite.<a href="#section-4.2-2.1.1" class="pilcrow">¶</a></p>
+</li>
+          <li class="normal" id="section-4.2-2.2">
+            <p id="section-4.2-2.2.1">Otherwise, for any other WIT signature algorithm allowed by
+<span>[<a href="#I-D.ietf-wimse-workload-creds" class="cite xref">I-D.ietf-wimse-workload-creds</a>]</span>, the client <span class="bcp14">MUST</span> use the classical ciphersuite.<a href="#section-4.2-2.2.1" class="pilcrow">¶</a></p>
+</li>
+        </ul>
+<p id="section-4.2-3">The client <span class="bcp14">MUST</span> set <code>wimse-kem-suite</code> to the wire value of that selected ciphersuite.
+The server's WIT signature algorithm does not change the selected ciphersuite.<a href="#section-4.2-3" class="pilcrow">¶</a></p>
+<p id="section-4.2-4">A server that does not implement the requested ciphersuite <span class="bcp14">MUST NOT</span> include
+<code>wimse-kem-suite</code> and <code>wimse-kem</code> as required for this extension on the handshake
+response.
+The client then treats the extension as not negotiated (<a href="#negotiate" class="auto internal xref">Section 9</a>).<a href="#section-4.2-4" class="pilcrow">¶</a></p>
+</section>
+</div>
+</section>
+</div>
+<div id="key-derivation">
+<section id="section-5">
+      <h2 id="name-key-export">
+<a href="#section-5" class="section-number selfRef">5. </a><a href="#name-key-export" class="section-name selfRef">Key Export</a>
+      </h2>
+<p id="section-5-1">Both sides export MAC keys and a session identifier from the HPKE context
+established in <a href="#handshake" class="auto internal xref">Section 4</a>:<a href="#section-5-1" class="pilcrow">¶</a></p>
+<div class="alignLeft art-text artwork" id="section-5-2">
+<pre>
+OKM = Context.Export("session-keys", 80)
+k_req = OKM[0..31]
+k_res = OKM[32..63]
+session_id = OKM[64..79]
+</pre><a href="#section-5-2" class="pilcrow">¶</a>
+</div>
+<p id="section-5-3">where:<a href="#section-5-3" class="pilcrow">¶</a></p>
+<ul class="normal">
+<li class="normal" id="section-5-4.1">
+          <p id="section-5-4.1.1"><code>Context</code> is <code>context_S</code> on the server and <code>context_R</code> on the client.<a href="#section-5-4.1.1" class="pilcrow">¶</a></p>
+</li>
+        <li class="normal" id="section-5-4.2">
+          <p id="section-5-4.2.1"><code>Context.Export</code> is the HPKE secret export interface
+(<span><a href="https://rfc-editor.org/rfc/rfc9180#section-5.3" class="relref">Section 5.3</a> of [<a href="#RFC9180" class="cite xref">RFC9180</a>]</span>) with <code>exporter_context</code> equal to the ASCII string
+<code>session-keys</code>.<a href="#section-5-4.2.1" class="pilcrow">¶</a></p>
+</li>
+      </ul>
+<p id="section-5-5"><code>k_req</code> MACs session requests.
+<code>k_res</code> MACs session responses.
+<code>session_id</code> is the session identifier carried as <code>wimse-session-id</code> in <a href="#session" class="auto internal xref">Section 6</a>.
+Both peers compute it from the HPKE export; it is not sent on the handshake.<a href="#section-5-5" class="pilcrow">¶</a></p>
+</section>
+</div>
+<div id="session">
+<section id="section-6">
+      <h2 id="name-session-messages">
+<a href="#section-6" class="section-number selfRef">6. </a><a href="#name-session-messages" class="section-name selfRef">Session Messages</a>
+      </h2>
+<p id="section-6-1">After the handshake response, messages <span class="bcp14">MAY</span> use a session signature instead of a WIT signature.<a href="#section-6-1" class="pilcrow">¶</a></p>
+<p id="section-6-2">Session messages <span class="bcp14">MUST NOT</span> carry a Workload Identity Token or a <code>Workload-Identity-Token</code> header.<a href="#section-6-2" class="pilcrow">¶</a></p>
+<p id="section-6-3">A session signature on a request or response:<a href="#section-6-3" class="pilcrow">¶</a></p>
+<ul class="normal">
+<li class="normal" id="section-6-4.1">
+          <p id="section-6-4.1.1"><span class="bcp14">MUST</span> use <code>tag</code> = <code>wimse-httpsig-session</code>.<a href="#section-6-4.1.1" class="pilcrow">¶</a></p>
+</li>
+        <li class="normal" id="section-6-4.2">
+          <p id="section-6-4.2.1"><span class="bcp14">MUST</span> use the HTTP Message Signatures algorithm <code>hmac-sha256</code>.<a href="#section-6-4.2.1" class="pilcrow">¶</a></p>
+</li>
+        <li class="normal" id="section-6-4.3">
+          <p id="section-6-4.3.1"><span class="bcp14">MUST</span> include <code>wimse-session-id</code>: Byte Sequence; the <code>session_id</code> value exported in
+<a href="#key-derivation" class="auto internal xref">Section 5</a>.<a href="#section-6-4.3.1" class="pilcrow">¶</a></p>
+</li>
+        <li class="normal" id="section-6-4.4">
+          <p id="section-6-4.4.1">Ticket parameters follow <a href="#ticket" class="auto internal xref">Section 8</a>: <code>wimse-ticket-server</code> when established on the
+handshake response; <code>wimse-ticket-client</code> when established on a prior or current
+session request.<a href="#section-6-4.4.1" class="pilcrow">¶</a></p>
+</li>
+        <li class="normal" id="section-6-4.5">
+          <p id="section-6-4.5.1"><span class="bcp14">MUST</span> include the same signature parameters as the base profile for requests or responses,
+as applicable; <code>expires</code> <span class="bcp14">MUST NOT</span> be after the bound in <a href="#lifetime" class="auto internal xref">Section 7</a>.<a href="#section-6-4.5.1" class="pilcrow">¶</a></p>
+</li>
+        <li class="normal" id="section-6-4.6">
+          <p id="section-6-4.6.1"><span class="bcp14">MUST</span> cover the same components as the base profile for requests or responses, as applicable,
+except that <code>Workload-Identity-Token</code> is not covered because it is absent.<a href="#section-6-4.6.1" class="pilcrow">¶</a></p>
+</li>
+        <li class="normal" id="section-6-4.7">
+          <p id="section-6-4.7.1"><span class="bcp14">MUST NOT</span> be combined with a <code>wimse-workload-to-workload</code> signature on the same message.<a href="#section-6-4.7.1" class="pilcrow">¶</a></p>
+</li>
+      </ul>
+<p id="section-6-5">The sender MACs requests with <code>k_req</code> and responses with <code>k_res</code>.
+The recipient selects the session with <code>wimse-session-id</code>.
+A client replica <span class="bcp14">MAY</span> open <code>wimse-ticket-client</code> to obtain MAC keys; a server replica <span class="bcp14">MAY</span> open
+<code>wimse-ticket-server</code> (see <a href="#ticket" class="auto internal xref">Section 8</a>).
+Otherwise the recipient looks up MAC keys from local session state keyed by
+<code>wimse-session-id</code>.
+The recipient verifies accordingly.<a href="#section-6-5" class="pilcrow">¶</a></p>
+<p id="section-6-6">Recipients recognize a WIMSE session signature solely by <code>tag</code> = <code>wimse-httpsig-session</code>.
+If more than one signature has that tag, the recipient <span class="bcp14">MUST</span> reject the message.<a href="#section-6-6" class="pilcrow">¶</a></p>
+</section>
+</div>
+<div id="lifetime">
+<section id="section-7">
+      <h2 id="name-session-lifetime">
+<a href="#section-7" class="section-number selfRef">7. </a><a href="#name-session-lifetime" class="section-name selfRef">Session Lifetime</a>
+      </h2>
+<p id="section-7-1">Let <code>session_exp</code> be the earlier of the two handshake WIT <code>exp</code> values.
+Peers <span class="bcp14">MUST NOT</span> use <code>k_req</code> or <code>k_res</code> after <code>session_exp</code>.
+Senders <span class="bcp14">MUST NOT</span> set <code>expires</code> after <code>session_exp</code>.
+Recipients <span class="bcp14">MUST</span> reject a session signature if <code>expires</code> is after <code>session_exp</code>,
+or if the current time is after <code>session_exp</code>.
+Comparisons against <code>session_exp</code> use the same clock-skew policy the deployment
+applies when validating WIT <code>exp</code> claims <span>[<a href="#I-D.ietf-wimse-workload-creds" class="cite xref">I-D.ietf-wimse-workload-creds</a>]</span>.<a href="#section-7-1" class="pilcrow">¶</a></p>
+<p id="section-7-2">Per-message <code>expires</code> remains as in the base profile and is typically much shorter.
+<code>session_exp</code> only caps how long handshake authority may be reused as MAC keys.<a href="#section-7-2" class="pilcrow">¶</a></p>
+<p id="section-7-3">This document does not define rehandshake inside a session.
+Peers that need a fresh session run a new handshake.
+Each session has its own <code>session_id</code>, key material, and, when issued, its own tickets.<a href="#section-7-3" class="pilcrow">¶</a></p>
+</section>
+</div>
+<div id="ticket">
+<section id="section-8">
+      <h2 id="name-tickets">
+<a href="#section-8" class="section-number selfRef">8. </a><a href="#name-tickets" class="section-name selfRef">Tickets</a>
+      </h2>
+<p id="section-8-1">Tickets are optional per session and issuer-specific.
+<code>wimse-session-id</code> identifies the session on the wire in <a href="#session" class="auto internal xref">Section 6</a>;
+its value is exported in <a href="#key-derivation" class="auto internal xref">Section 5</a>.
+A peer that keeps session keys in local (or shared) state keyed by <code>session_id</code>
+        <span class="bcp14">MAY</span> omit its ticket.
+A ticket is useful when a replica of that issuer must recover session keys without that
+shared state.<a href="#section-8-1" class="pilcrow">¶</a></p>
+<p id="section-8-2">This document defines two signature parameters, each an opaque Byte Sequence:<a href="#section-8-2" class="pilcrow">¶</a></p>
+<ul class="normal">
+<li class="normal" id="section-8-3.1">
+          <p id="section-8-3.1.1"><code>wimse-ticket-client</code>: issued by the client; only the client deployment opens it.<a href="#section-8-3.1.1" class="pilcrow">¶</a></p>
+</li>
+        <li class="normal" id="section-8-3.2">
+          <p id="section-8-3.2.1"><code>wimse-ticket-server</code>: issued by the server; only the server deployment opens it.<a href="#section-8-3.2.1" class="pilcrow">¶</a></p>
+</li>
+      </ul>
+<p id="section-8-4">Issuance happens only after the issuer can populate the ticket with the exported
+MAC keys (<a href="#key-derivation" class="auto internal xref">Section 5</a>) and <code>session_exp</code> (<a href="#lifetime" class="auto internal xref">Section 7</a>):<a href="#section-8-4" class="pilcrow">¶</a></p>
+<ul class="normal">
+<li class="normal" id="section-8-5.1">
+          <p id="section-8-5.1.1">The server <span class="bcp14">MAY</span> include <code>wimse-ticket-server</code> on the handshake response.<a href="#section-8-5.1.1" class="pilcrow">¶</a></p>
+</li>
+        <li class="normal" id="section-8-5.2">
+          <p id="section-8-5.2.1">The client <span class="bcp14">MUST NOT</span> include <code>wimse-ticket-client</code> on the handshake request.
+The client <span class="bcp14">MAY</span> include <code>wimse-ticket-client</code> on a session request after key export
+(typically the first session request).<a href="#section-8-5.2.1" class="pilcrow">¶</a></p>
+</li>
+        <li class="normal" id="section-8-5.3">
+          <p id="section-8-5.3.1">Once <code>wimse-ticket-server</code> has been established, session requests and responses <span class="bcp14">MUST</span>
+echo that same value and <span class="bcp14">MUST NOT</span> change it for the rest of the session.<a href="#section-8-5.3.1" class="pilcrow">¶</a></p>
+</li>
+        <li class="normal" id="section-8-5.4">
+          <p id="section-8-5.4.1">Once the client has sent <code>wimse-ticket-client</code>, later session requests <span class="bcp14">MUST</span> echo that
+same value and <span class="bcp14">MUST NOT</span> change it for the rest of the session.<a href="#section-8-5.4.1" class="pilcrow">¶</a></p>
+</li>
+        <li class="normal" id="section-8-5.5">
+          <p id="section-8-5.5.1">A session response <span class="bcp14">MUST</span> echo <code>wimse-ticket-client</code> when the corresponding request
+carried it, using that same value.
+Concurrent requests may still be in flight without the ticket when another request
+first establishes it; a response to a request that omitted <code>wimse-ticket-client</code> <span class="bcp14">MAY</span>
+omit it.<a href="#section-8-5.5.1" class="pilcrow">¶</a></p>
+</li>
+        <li class="normal" id="section-8-5.6">
+          <p id="section-8-5.6.1">Senders <span class="bcp14">MUST NOT</span> include a ticket parameter that has not been established.<a href="#section-8-5.6.1" class="pilcrow">¶</a></p>
+</li>
+      </ul>
+<p id="section-8-6">A peer that already has the keys from <a href="#key-derivation" class="auto internal xref">Section 5</a> (or from local session state)
+need not open a ticket; it only echoes parameters it must carry.<a href="#section-8-6" class="pilcrow">¶</a></p>
+<p id="section-8-7">This document does not specify ticket format or how each deployment manages
+ticket-opening keys.
+Those keys are not shared across the two deployments.
+When a ticket carries session key material, the issuer <span class="bcp14">MUST</span> protect that material with
+authenticated encryption, or with equivalent confidentiality and integrity protection,
+under keys known only to that deployment.<a href="#section-8-7" class="pilcrow">¶</a></p>
+<p id="section-8-8">A ticket implementation needs enough data for a replica of the issuing peer to obtain
+<code>k_req</code> and <code>k_res</code> and to enforce <a href="#lifetime" class="auto internal xref">Section 7</a>.
+The following content is <span class="bcp14">RECOMMENDED</span> inside the protected ticket material:<a href="#section-8-8" class="pilcrow">¶</a></p>
+<ul class="normal">
+<li class="normal" id="section-8-9.1">
+          <p id="section-8-9.1.1"><code>session_id</code>,<a href="#section-8-9.1.1" class="pilcrow">¶</a></p>
+</li>
+        <li class="normal" id="section-8-9.2">
+          <p id="section-8-9.2.1"><code>k_req</code> and <code>k_res</code> (or equivalent key material),<a href="#section-8-9.2.1" class="pilcrow">¶</a></p>
+</li>
+        <li class="normal" id="section-8-9.3">
+          <p id="section-8-9.3.1">client and server <code>sub</code> values,<a href="#section-8-9.3.1" class="pilcrow">¶</a></p>
+</li>
+        <li class="normal" id="section-8-9.4">
+          <p id="section-8-9.4.1"><code>wimse-aud</code>,<a href="#section-8-9.4.1" class="pilcrow">¶</a></p>
+</li>
+        <li class="normal" id="section-8-9.5">
+          <p id="section-8-9.5.1"><code>session_exp</code>.<a href="#section-8-9.5.1" class="pilcrow">¶</a></p>
+</li>
+      </ul>
+<p id="section-8-10">A recipient that uses a ticket to obtain keys <span class="bcp14">MUST</span> reject it if the ticket cannot be
+decoded or authenticated under current local policy.
+If a session message carries <code>wimse-session-id</code> and an opened ticket decodes to a
+different <code>session_id</code>, the recipient <span class="bcp14">MUST</span> reject the message.<a href="#section-8-10" class="pilcrow">¶</a></p>
+</section>
+</div>
+<div id="negotiate">
+<section id="section-9">
+      <h2 id="name-negotiating-the-extension">
+<a href="#section-9" class="section-number selfRef">9. </a><a href="#name-negotiating-the-extension" class="section-name selfRef">Negotiating the Extension</a>
+      </h2>
+<p id="section-9-1">Unknown signature parameters do not by themselves fail <span>[<a href="#RFC9421" class="cite xref">RFC9421</a>]</span> verification,
+and <span>[<a href="#I-D.ietf-wimse-http-signature" class="cite xref">I-D.ietf-wimse-http-signature</a>]</span> does not require rejecting them.
+A base-profile-only server may therefore accept a request that carries <code>wimse-kem-suite</code>
+and <code>wimse-kem</code> while ignoring those parameters.<a href="#section-9-1" class="pilcrow">¶</a></p>
+<p id="section-9-2">The client treats the extension as negotiated only if the handshake response includes
+<code>wimse-kem-suite</code> and <code>wimse-kem</code> as required in <a href="#handshake" class="auto internal xref">Section 4</a>.
+Otherwise the client <span class="bcp14">MUST NOT</span> use session signatures from this exchange and continues
+with the base profile.<a href="#section-9-2" class="pilcrow">¶</a></p>
+</section>
+</div>
+<div id="examples">
+<section id="section-10">
+      <h2 id="name-examples">
+<a href="#section-10" class="section-number selfRef">10. </a><a href="#name-examples" class="section-name selfRef">Examples</a>
+      </h2>
+<p id="section-10-1">The following messages illustrate one handshake and the first session exchange
+between the same peers.
+The <code>nonce</code> values are illustrative and do not meet the entropy requirement of the
+base profile. Some values are truncated for readability.<a href="#section-10-1" class="pilcrow">¶</a></p>
+<span id="name-handshake-request"></span><figure id="figure-1">
+        <div class="lang-http sourcecode" id="section-10-2.1">
+<pre>
+=============== NOTE: '\' line wrapping per RFC 8792 ================
+
+GET /gimme-ice-cream?flavor=vanilla HTTP/1.1
+Host: svcb.example.com
+Signature: sig1=:JOn518Mhsejiz1cPgRTeZKBh9Bxz8sBCcgOFSsuVdP9HGhzMhXc\
+ULvQKLibB1KWH8CzlDyjEcY7bT6ahzv8CDw==:
+Signature-Input: sig1=("@method" "@path" "@query" "workload-identity\
+-token");created=1795603147;expires=1795603447;nonce="fast1111";tag=\
+"wimse-workload-to-workload";wimse-aud="https://svcb.example.com/gim\
+me-ice-cream";wimse-sign-response;wimse-kem-suite=:ABAAAf//:;wimse-k\
+em=:BNng0D1r4QDiAWMpfBv/eke12bfkhBfxm9BRPu92AMgO97ZA4/kP+bvRMvxraSf/\
+dTuymVSnpKN5ji6UMe3QnSg=:
+Workload-Identity-Token: eyJhbGciOiJFZDI1NTE5...-B1ORziWHAAw
+
+</pre>
+</div>
+<figcaption><a href="#figure-1" class="selfRef">Figure 1</a>:
+<a href="#name-handshake-request" class="selfRef">Handshake Request</a>
+        </figcaption></figure>
+<span id="name-handshake-response"></span><figure id="figure-2">
+        <div class="lang-http sourcecode" id="section-10-3.1">
+<pre>
+=============== NOTE: '\' line wrapping per RFC 8792 ================
+
+HTTP/1.1 404 Not Found
+Content-Length: 20
+Content-Digest: sha-256=:uJC3qmCc7n6/6w4N2I0vAfj1cd/hTOAhxLEYXmPbNno\
+=:
+Content-Type: text/plain
+Signature: sig1=:hnHaKv7YNbiYEfMu2VwE2T6371K+Vi7FUmnnj/e5dbhPradNcv7\
+ybQRCppmS1wZrom6lCWzWmfUV3t9RXbWKAA==:
+Signature-Input: sig1=("@status" "workload-identity-token" "content-\
+type" "content-digest" "@method";req "@path";req "@query";req);creat\
+ed=1795603147;expires=1795603449;nonce="fast2222";tag="wimse-workloa\
+d-to-workload";wimse-req-nonce="fast1111";wimse-kem-suite=:ABAAAf//:\
+;wimse-kem=:BHkeeUK2/Sg60GbqQ7oXriDu85CR49sYkPqRH7F+s4tTDruB0H648/hR\
+abnMqVt9x2tPCa1R7/ktrmh3Ck4T3SM=:;wimse-ticket-server=:dGlja2V0...Gx\
+wdHg==:
+Workload-Identity-Token: eyJhbGciOiJFZDI1NTE5...EaAJDeFQ75CA
+
+No ice cream today.
+</pre>
+</div>
+<figcaption><a href="#figure-2" class="selfRef">Figure 2</a>:
+<a href="#name-handshake-response" class="selfRef">Handshake Response</a>
+        </figcaption></figure>
+<span id="name-session-request"></span><figure id="figure-3">
+        <div class="lang-http sourcecode" id="section-10-4.1">
+<pre>
+=============== NOTE: '\' line wrapping per RFC 8792 ================
+
+GET /gimme-ice-cream?flavor=vanilla HTTP/1.1
+Host: svcb.example.com
+Signature: sig1=:BOzmD0gP96FOq1+qdZrAi5kurV5qXIzcvURse1G6DN4=:
+Signature-Input: sig1=("@method" "@path" "@query");created=179560314\
+7;expires=1795603447;nonce="fast3333";alg="hmac-sha256";tag="wimse-h\
+ttpsig-session";wimse-aud="https://svcb.example.com/gimme-ice-cream"\
+;wimse-sign-response;wimse-session-id=:C1rrnxDm3kFUpk7AKgeNBQ==:;wim\
+se-ticket-server=:dGlja2V0...GxwdHg==:;wimse-ticket-client=:dGlja2V0\
+...SktMTU4=:
+
+</pre>
+</div>
+<figcaption><a href="#figure-3" class="selfRef">Figure 3</a>:
+<a href="#name-session-request" class="selfRef">Session Request</a>
+        </figcaption></figure>
+<span id="name-session-response"></span><figure id="figure-4">
+        <div class="lang-http sourcecode" id="section-10-5.1">
+<pre>
+=============== NOTE: '\' line wrapping per RFC 8792 ================
+
+HTTP/1.1 404 Not Found
+Content-Length: 20
+Content-Digest: sha-256=:uJC3qmCc7n6/6w4N2I0vAfj1cd/hTOAhxLEYXmPbNno\
+=:
+Content-Type: text/plain
+Signature: sig1=:Lu1VoaYruP5CIyRR+RQmoBrxBKULTQINw6JrWGoJksA=:
+Signature-Input: sig1=("@status" "content-type" "content-digest" "@m\
+ethod";req "@path";req "@query";req);created=1795603147;expires=1795\
+603447;nonce="fast4444";alg="hmac-sha256";tag="wimse-httpsig-session\
+";wimse-req-nonce="fast3333";wimse-session-id=:C1rrnxDm3kFUpk7AKgeNB\
+Q==:;wimse-ticket-server=:dGlja2V0...GxwdHg==:;wimse-ticket-client=:\
+dGlja2V0...SktMTU4=:
+
+No ice cream today.
+</pre>
+</div>
+<figcaption><a href="#figure-4" class="selfRef">Figure 4</a>:
+<a href="#name-session-response" class="selfRef">Session Response</a>
+        </figcaption></figure>
+</section>
+</div>
+<div id="security">
+<section id="section-11">
+      <h2 id="name-security-considerations">
+<a href="#section-11" class="section-number selfRef">11. </a><a href="#name-security-considerations" class="section-name selfRef">Security Considerations</a>
+      </h2>
+<p id="section-11-1">The base profile's considerations in <span>[<a href="#I-D.ietf-wimse-http-signature" class="cite xref">I-D.ietf-wimse-http-signature</a>]</span> apply to the handshake.<a href="#section-11-1" class="pilcrow">¶</a></p>
+<p id="section-11-2">An attacker that breaks the HPKE KEM for a recorded handshake can forge session MACs
+until <code>session_exp</code>; see <a href="#lifetime" class="auto internal xref">Section 7</a>.
+With the classical ciphersuite, a future quantum attacker that breaks DHKEM can forge
+those MACs.
+With the post-quantum ciphersuite, the exported MAC keys resist that class of attack on
+the KEM.
+Authentication of the handshake itself remains the WIT signature algorithms
+allowed by <span>[<a href="#I-D.ietf-wimse-workload-creds" class="cite xref">I-D.ietf-wimse-workload-creds</a>]</span>.
+Handshake authentication is post-quantum only when those algorithms are
+(<code>ML-DSA-44</code>, <code>ML-DSA-65</code>, or <code>ML-DSA-87</code>).
+Selecting the post-quantum HPKE ciphersuite for a classical WIT algorithm is not
+defined; see <a href="#suite-selection" class="auto internal xref">Section 4.2</a>.<a href="#section-11-2" class="pilcrow">¶</a></p>
+<p id="section-11-3">HPKE export secrets are determined by the HPKE context.
+A replayed <code>enc</code> with the same <code>info</code> yields the same exported keys
+(<span><a href="https://rfc-editor.org/rfc/rfc9180#section-5.3" class="relref">Section 5.3</a> of [<a href="#RFC9180" class="cite xref">RFC9180</a>]</span>).
+The WIT-signed handshake and its <code>nonce</code> values bind that context to a single
+authenticated exchange; session-message <code>nonce</code> values still apply as in the base
+profile.<a href="#section-11-3" class="pilcrow">¶</a></p>
+<p id="section-11-4">The first session request is the client's key-confirmation message.
+A peer that sees only the handshake response may not hold <code>k_req</code>.<a href="#section-11-4" class="pilcrow">¶</a></p>
+<p id="section-11-5">Separate ticket issuers confine minting: an opening key for one deployment does not
+open the other deployment's tickets.
+Whoever can mint tickets for a deployment can forge session MACs that its replicas
+accept after opening the ticket.<a href="#section-11-5" class="pilcrow">¶</a></p>
+<p id="section-11-6">A recommended ticket carries both <code>k_req</code> and <code>k_res</code>.
+An attacker who opens a captured ticket recovers both MAC keys and can forge to either
+peer, including one that uses ordinary session state.
+Retained old opening keys keep previously issued tickets openable, which defeats
+forward secrecy for the enclosed MAC keys until <code>session_exp</code>.
+Rotate opening keys at least as often as the maximum WIT lifetime the deployment
+accepts, and minimize retention of old keys.<a href="#section-11-6" class="pilcrow">¶</a></p>
+<p id="section-11-7">Session messages omit the WIT.
+Revocation or status checks that require the WIT apply at handshake time only.
+After that, authority to speak in the session is carried by the MAC keys
+and <code>wimse-session-id</code> until <code>session_exp</code>; see <a href="#lifetime" class="auto internal xref">Section 7</a>.<a href="#section-11-7" class="pilcrow">¶</a></p>
+<p id="section-11-8"><code>session_id</code> is taken from the same Export output as the MAC keys but is carried in
+cleartext.
+It identifies the session; it is not a secret authenticator.
+Possession of <code>session_id</code> alone does not allow forging session MACs.<a href="#section-11-8" class="pilcrow">¶</a></p>
+<p id="section-11-9">Replay of session messages is unchanged from the base profile:
+<code>nonce</code> and optional replay caches help, and caches that are not shared across replicas
+leave cross-replica replay possible.<a href="#section-11-9" class="pilcrow">¶</a></p>
+<p id="section-11-10">TLS-terminating intermediaries see <code>wimse-session-id</code>, ticket parameters (when present),
+and MAC values in cleartext.
+With the ticket protection required in <a href="#ticket" class="auto internal xref">Section 8</a>, they see ciphertext rather than
+<code>k_req</code> and <code>k_res</code>.
+They cannot alter covered components without failing verification.
+They can attempt capture-and-replay within <code>expires</code>.<a href="#section-11-10" class="pilcrow">¶</a></p>
+</section>
+</div>
+<div id="iana">
+<section id="section-12">
+      <h2 id="name-iana-considerations">
+<a href="#section-12" class="section-number selfRef">12. </a><a href="#name-iana-considerations" class="section-name selfRef">IANA Considerations</a>
+      </h2>
+<div id="http-signature-metadata-parameters">
+<section id="section-12.1">
+        <h3 id="name-http-signature-metadata-par">
+<a href="#section-12.1" class="section-number selfRef">12.1. </a><a href="#name-http-signature-metadata-par" class="section-name selfRef">HTTP Signature Metadata Parameters</a>
+        </h3>
+<p id="section-12.1-1">IANA is requested to register the following entries in the
+"HTTP Signature Metadata Parameters" registry <span>[<a href="#IANA.HTTP.MESSAGE.SIGNATURE" class="cite xref">IANA.HTTP.MESSAGE.SIGNATURE</a>]</span>,
+per <span><a href="https://rfc-editor.org/rfc/rfc9421#section-6.3.1" class="relref">Section 6.3.1</a> of [<a href="#RFC9421" class="cite xref">RFC9421</a>]</span>:<a href="#section-12.1-1" class="pilcrow">¶</a></p>
+<div id="wimse-kem-suite">
+<section id="section-12.1.1">
+          <h4 id="name-wimse-kem-suite">
+<a href="#section-12.1.1" class="section-number selfRef">12.1.1. </a><a href="#name-wimse-kem-suite" class="section-name selfRef"><code>wimse-kem-suite</code></a>
+          </h4>
+<ul class="normal">
+<li class="normal" id="section-12.1.1-1.1">
+              <p id="section-12.1.1-1.1.1">Name: <code>wimse-kem-suite</code><a href="#section-12.1.1-1.1.1" class="pilcrow">¶</a></p>
+</li>
+            <li class="normal" id="section-12.1.1-1.2">
+              <p id="section-12.1.1-1.2.1">Description: Byte Sequence; HPKE ciphersuite <code>kem_id || kdf_id || aead_id</code> for a WIMSE
+fast HTTP signature handshake.<a href="#section-12.1.1-1.2.1" class="pilcrow">¶</a></p>
+</li>
+            <li class="normal" id="section-12.1.1-1.3">
+              <p id="section-12.1.1-1.3.1">Reference: RFC XXX, <a href="#handshake" class="auto internal xref">Section 4</a>.<a href="#section-12.1.1-1.3.1" class="pilcrow">¶</a></p>
+</li>
+          </ul>
+</section>
+</div>
+<div id="wimse-kem">
+<section id="section-12.1.2">
+          <h4 id="name-wimse-kem">
+<a href="#section-12.1.2" class="section-number selfRef">12.1.2. </a><a href="#name-wimse-kem" class="section-name selfRef"><code>wimse-kem</code></a>
+          </h4>
+<ul class="normal">
+<li class="normal" id="section-12.1.2-1.1">
+              <p id="section-12.1.2-1.1.1">Name: <code>wimse-kem</code><a href="#section-12.1.2-1.1.1" class="pilcrow">¶</a></p>
+</li>
+            <li class="normal" id="section-12.1.2-1.2">
+              <p id="section-12.1.2-1.2.1">Description: Byte Sequence; HPKE recipient public key on the handshake request, or HPKE
+<code>enc</code> on the handshake response.<a href="#section-12.1.2-1.2.1" class="pilcrow">¶</a></p>
+</li>
+            <li class="normal" id="section-12.1.2-1.3">
+              <p id="section-12.1.2-1.3.1">Reference: RFC XXX, <a href="#handshake" class="auto internal xref">Section 4</a>.<a href="#section-12.1.2-1.3.1" class="pilcrow">¶</a></p>
+</li>
+          </ul>
+</section>
+</div>
+<div id="wimse-session-id">
+<section id="section-12.1.3">
+          <h4 id="name-wimse-session-id">
+<a href="#section-12.1.3" class="section-number selfRef">12.1.3. </a><a href="#name-wimse-session-id" class="section-name selfRef"><code>wimse-session-id</code></a>
+          </h4>
+<ul class="normal">
+<li class="normal" id="section-12.1.3-1.1">
+              <p id="section-12.1.3-1.1.1">Name: <code>wimse-session-id</code><a href="#section-12.1.3-1.1.1" class="pilcrow">¶</a></p>
+</li>
+            <li class="normal" id="section-12.1.3-1.2">
+              <p id="section-12.1.3-1.2.1">Description: Byte Sequence; HPKE-exported session identifier for WIMSE fast HTTP
+signature session messages.<a href="#section-12.1.3-1.2.1" class="pilcrow">¶</a></p>
+</li>
+            <li class="normal" id="section-12.1.3-1.3">
+              <p id="section-12.1.3-1.3.1">Reference: RFC XXX, <a href="#key-derivation" class="auto internal xref">Section 5</a>, <a href="#session" class="auto internal xref">Section 6</a>.<a href="#section-12.1.3-1.3.1" class="pilcrow">¶</a></p>
+</li>
+          </ul>
+</section>
+</div>
+<div id="wimse-ticket-client">
+<section id="section-12.1.4">
+          <h4 id="name-wimse-ticket-client">
+<a href="#section-12.1.4" class="section-number selfRef">12.1.4. </a><a href="#name-wimse-ticket-client" class="section-name selfRef"><code>wimse-ticket-client</code></a>
+          </h4>
+<ul class="normal">
+<li class="normal" id="section-12.1.4-1.1">
+              <p id="section-12.1.4-1.1.1">Name: <code>wimse-ticket-client</code><a href="#section-12.1.4-1.1.1" class="pilcrow">¶</a></p>
+</li>
+            <li class="normal" id="section-12.1.4-1.2">
+              <p id="section-12.1.4-1.2.1">Description: Byte Sequence; optional opaque client-issued session ticket for WIMSE fast
+HTTP signature session messages (issued after key export).<a href="#section-12.1.4-1.2.1" class="pilcrow">¶</a></p>
+</li>
+            <li class="normal" id="section-12.1.4-1.3">
+              <p id="section-12.1.4-1.3.1">Reference: RFC XXX, <a href="#ticket" class="auto internal xref">Section 8</a>.<a href="#section-12.1.4-1.3.1" class="pilcrow">¶</a></p>
+</li>
+          </ul>
+</section>
+</div>
+<div id="wimse-ticket-server">
+<section id="section-12.1.5">
+          <h4 id="name-wimse-ticket-server">
+<a href="#section-12.1.5" class="section-number selfRef">12.1.5. </a><a href="#name-wimse-ticket-server" class="section-name selfRef"><code>wimse-ticket-server</code></a>
+          </h4>
+<ul class="normal">
+<li class="normal" id="section-12.1.5-1.1">
+              <p id="section-12.1.5-1.1.1">Name: <code>wimse-ticket-server</code><a href="#section-12.1.5-1.1.1" class="pilcrow">¶</a></p>
+</li>
+            <li class="normal" id="section-12.1.5-1.2">
+              <p id="section-12.1.5-1.2.1">Description: Byte Sequence; optional opaque server-issued session ticket for WIMSE fast
+HTTP signature handshake responses and session messages.<a href="#section-12.1.5-1.2.1" class="pilcrow">¶</a></p>
+</li>
+            <li class="normal" id="section-12.1.5-1.3">
+              <p id="section-12.1.5-1.3.1">Reference: RFC XXX, <a href="#ticket" class="auto internal xref">Section 8</a>.<a href="#section-12.1.5-1.3.1" class="pilcrow">¶</a></p>
+</li>
+          </ul>
+</section>
+</div>
+</section>
+</div>
+</section>
+</div>
+<div id="open-issues">
+<section id="section-13">
+      <h2 id="name-open-issues">
+<a href="#section-13" class="section-number selfRef">13. </a><a href="#name-open-issues" class="section-name selfRef">Open Issues</a>
+      </h2>
+<ul class="normal">
+<li class="normal" id="section-13-1.1">
+          <p id="section-13-1.1.1">Error responses when the ticket is rejected and when session MAC verification fails.<a href="#section-13-1.1.1" class="pilcrow">¶</a></p>
+</li>
+        <li class="normal" id="section-13-1.2">
+          <p id="section-13-1.2.1">Whether a session needs an explicit cleanup hint so peers can drop ticket and MAC state
+before <code>session_exp</code> (see <a href="#lifetime" class="auto internal xref">Section 7</a>), rather than waiting for that bound alone.<a href="#section-13-1.2.1" class="pilcrow">¶</a></p>
+</li>
+      </ul>
+</section>
+</div>
+<div id="sec-combined-references">
+<section id="section-14">
+      <h2 id="name-references">
+<a href="#section-14" class="section-number selfRef">14. </a><a href="#name-references" class="section-name selfRef">References</a>
+      </h2>
+<div id="sec-normative-references">
+<section id="section-14.1">
+        <h3 id="name-normative-references">
+<a href="#section-14.1" class="section-number selfRef">14.1. </a><a href="#name-normative-references" class="section-name selfRef">Normative References</a>
+        </h3>
+<dl class="references">
+<dt id="I-D.ietf-hpke-pq">[I-D.ietf-hpke-pq]</dt>
+        <dd>
+<span class="refAuthor">Barnes, R.</span> and <span class="refAuthor">D. Connolly</span>, <span class="refTitle">"Post-Quantum and Post-Quantum/Traditional Hybrid Algorithms for HPKE"</span>, <span class="refContent">Work in Progress</span>, <span class="seriesInfo">Internet-Draft, draft-ietf-hpke-pq-05</span>, <time datetime="2026-07-06" class="refDate">6 July 2026</time>, <span>&lt;<a href="https://datatracker.ietf.org/doc/html/draft-ietf-hpke-pq-05">https://datatracker.ietf.org/doc/html/draft-ietf-hpke-pq-05</a>&gt;</span>. </dd>
+<dd class="break"></dd>
+<dt id="I-D.ietf-wimse-http-signature">[I-D.ietf-wimse-http-signature]</dt>
+        <dd>
+<span class="refAuthor">Salowey, J. A.</span> and <span class="refAuthor">Y. Sheffer</span>, <span class="refTitle">"WIMSE Workload-to-Workload Authentication with HTTP Signatures"</span>, <span class="refContent">Work in Progress</span>, <span class="seriesInfo">Internet-Draft, draft-ietf-wimse-http-signature-09</span>, <time datetime="2026-11-20" class="refDate">20 November 2026</time>, <span>&lt;<a href="https://datatracker.ietf.org/doc/html/draft-ietf-wimse-http-signature-09">https://datatracker.ietf.org/doc/html/draft-ietf-wimse-http-signature-09</a>&gt;</span>. </dd>
+<dd class="break"></dd>
+<dt id="I-D.ietf-wimse-workload-creds">[I-D.ietf-wimse-workload-creds]</dt>
+        <dd>
+<span class="refAuthor">Campbell, B.</span>, <span class="refAuthor">Salowey, J. A.</span>, <span class="refAuthor">Schwenkschuster, A.</span>, <span class="refAuthor">Sheffer, Y.</span>, and <span class="refAuthor">Y. Rosomakho</span>, <span class="refTitle">"WIMSE Workload Credentials"</span>, <span class="refContent">Work in Progress</span>, <span class="seriesInfo">Internet-Draft, draft-ietf-wimse-workload-creds-03</span>, <time datetime="2026-10-30" class="refDate">30 October 2026</time>, <span>&lt;<a href="https://datatracker.ietf.org/doc/html/draft-ietf-wimse-workload-creds-03">https://datatracker.ietf.org/doc/html/draft-ietf-wimse-workload-creds-03</a>&gt;</span>. </dd>
+<dd class="break"></dd>
+<dt id="RFC2119">[RFC2119]</dt>
+        <dd>
+<span class="refAuthor">Bradner, S.</span>, <span class="refTitle">"Key words for use in RFCs to Indicate Requirement Levels"</span>, <span class="seriesInfo">BCP 14</span>, <span class="seriesInfo">RFC 2119</span>, <span class="seriesInfo">DOI 10.17487/RFC2119</span>, <time datetime="1997-03" class="refDate">March 1997</time>, <span>&lt;<a href="https://www.rfc-editor.org/rfc/rfc2119">https://www.rfc-editor.org/rfc/rfc2119</a>&gt;</span>. </dd>
+<dd class="break"></dd>
+<dt id="RFC8174">[RFC8174]</dt>
+        <dd>
+<span class="refAuthor">Leiba, B.</span>, <span class="refTitle">"Ambiguity of Uppercase vs Lowercase in RFC 2119 Key Words"</span>, <span class="seriesInfo">BCP 14</span>, <span class="seriesInfo">RFC 8174</span>, <span class="seriesInfo">DOI 10.17487/RFC8174</span>, <time datetime="2017-05" class="refDate">May 2017</time>, <span>&lt;<a href="https://www.rfc-editor.org/rfc/rfc8174">https://www.rfc-editor.org/rfc/rfc8174</a>&gt;</span>. </dd>
+<dd class="break"></dd>
+<dt id="RFC9180">[RFC9180]</dt>
+        <dd>
+<span class="refAuthor">Barnes, R.</span>, <span class="refAuthor">Bhargavan, K.</span>, <span class="refAuthor">Lipp, B.</span>, and <span class="refAuthor">C. Wood</span>, <span class="refTitle">"Hybrid Public Key Encryption"</span>, <span class="seriesInfo">RFC 9180</span>, <span class="seriesInfo">DOI 10.17487/RFC9180</span>, <time datetime="2022-02" class="refDate">February 2022</time>, <span>&lt;<a href="https://www.rfc-editor.org/rfc/rfc9180">https://www.rfc-editor.org/rfc/rfc9180</a>&gt;</span>. </dd>
+<dd class="break"></dd>
+<dt id="RFC9421">[RFC9421]</dt>
+        <dd>
+<span class="refAuthor">Backman, A., Ed.</span>, <span class="refAuthor">Richer, J., Ed.</span>, and <span class="refAuthor">M. Sporny</span>, <span class="refTitle">"HTTP Message Signatures"</span>, <span class="seriesInfo">RFC 9421</span>, <span class="seriesInfo">DOI 10.17487/RFC9421</span>, <time datetime="2024-02" class="refDate">February 2024</time>, <span>&lt;<a href="https://www.rfc-editor.org/rfc/rfc9421">https://www.rfc-editor.org/rfc/rfc9421</a>&gt;</span>. </dd>
+<dd class="break"></dd>
+<dt id="RFC9964">[RFC9964]</dt>
+      <dd>
+<span class="refAuthor">Prorock, M.</span> and <span class="refAuthor">O. Steele</span>, <span class="refTitle">"ML-DSA for JSON Object Signing and Encryption (JOSE) and CBOR Object Signing and Encryption (COSE)"</span>, <span class="seriesInfo">RFC 9964</span>, <span class="seriesInfo">DOI 10.17487/RFC9964</span>, <time datetime="2026-05" class="refDate">May 2026</time>, <span>&lt;<a href="https://www.rfc-editor.org/rfc/rfc9964">https://www.rfc-editor.org/rfc/rfc9964</a>&gt;</span>. </dd>
+<dd class="break"></dd>
+</dl>
+</section>
+</div>
+<div id="sec-informative-references">
+<section id="section-14.2">
+        <h3 id="name-informative-references">
+<a href="#section-14.2" class="section-number selfRef">14.2. </a><a href="#name-informative-references" class="section-name selfRef">Informative References</a>
+        </h3>
+<dl class="references">
+<dt id="I-D.ietf-wimse-arch">[I-D.ietf-wimse-arch]</dt>
+        <dd>
+<span class="refAuthor">Salowey, J. A.</span>, <span class="refAuthor">Rosomakho, Y.</span>, and <span class="refAuthor">H. Tschofenig</span>, <span class="refTitle">"Workload Identity in a Multi System Environment (WIMSE) Architecture"</span>, <span class="refContent">Work in Progress</span>, <span class="seriesInfo">Internet-Draft, draft-ietf-wimse-arch-09</span>, <time datetime="2026-11-16" class="refDate">16 November 2026</time>, <span>&lt;<a href="https://datatracker.ietf.org/doc/html/draft-ietf-wimse-arch-09">https://datatracker.ietf.org/doc/html/draft-ietf-wimse-arch-09</a>&gt;</span>. </dd>
+<dd class="break"></dd>
+<dt id="IANA.HTTP.MESSAGE.SIGNATURE">[IANA.HTTP.MESSAGE.SIGNATURE]</dt>
+      <dd>
+<span class="refTitle">"HTTP Message Signature"</span>, <span>n.d.</span>, <span>&lt;<a href="https://www.iana.org/assignments/http-message-signature/http-message-signature.xhtml#signature-metadata-parameters">https://www.iana.org/assignments/http-message-signature/http-message-signature.xhtml#signature-metadata-parameters</a>&gt;</span>. </dd>
+<dd class="break"></dd>
+</dl>
+</section>
+</div>
+</section>
+</div>
+<div id="document-history">
+<section id="appendix-A">
+      <h2 id="name-document-history">
+<a href="#appendix-A" class="section-number selfRef">Appendix A. </a><a href="#name-document-history" class="section-name selfRef">Document History</a>
+      </h2>
+<p id="appendix-A-1"><span class="cref">RFC Editor: please remove before publication.</span><a href="#appendix-A-1" class="pilcrow">¶</a></p>
+<div id="draft-sheffer-wimse-fast-httpsig-00">
+<section id="appendix-A.1">
+        <h3 id="name-draft-sheffer-wimse-fast-ht">
+<a href="#appendix-A.1" class="section-number selfRef">A.1. </a><a href="#name-draft-sheffer-wimse-fast-ht" class="section-name selfRef">draft-sheffer-wimse-fast-httpsig-00</a>
+        </h3>
+<ul class="normal">
+<li class="normal" id="appendix-A.1-1.1">
+            <p id="appendix-A.1-1.1.1">Initial version.<a href="#appendix-A.1-1.1.1" class="pilcrow">¶</a></p>
+</li>
+        </ul>
+</section>
+</div>
+</section>
+</div>
+<div id="acknowledgments">
+<section id="appendix-B">
+      <h2 id="name-acknowledgments">
+<a href="#name-acknowledgments" class="section-name selfRef">Acknowledgments</a>
+      </h2>
+<p id="appendix-B-1">TODO.<a href="#appendix-B-1" class="pilcrow">¶</a></p>
+</section>
+</div>
+<div id="authors-addresses">
+<section id="appendix-C">
+      <h2 id="name-authors-addresses">
+<a href="#name-authors-addresses" class="section-name selfRef">Authors' Addresses</a>
+      </h2>
+<address class="vcard">
+        <div dir="auto" class="left"><span class="fn nameRole">Yaron Sheffer</span></div>
+<div dir="auto" class="left"><span class="org">Independent</span></div>
+<div class="email">
+<span>Email:</span>
+<a href="mailto:yaronf.ietf@gmail.com" class="email">yaronf.ietf@gmail.com</a>
+</div>
+</address>
+<address class="vcard">
+        <div dir="auto" class="left"><span class="fn nameRole">Joe Salowey</span></div>
+<div dir="auto" class="left"><span class="org">Palo Alto Networks</span></div>
+<div class="email">
+<span>Email:</span>
+<a href="mailto:joe@salowey.net" class="email">joe@salowey.net</a>
+</div>
+</address>
+</section>
+</div>
+<script>const toc = document.getElementById("toc");
+toc.querySelector("h2").addEventListener("click", e => {
+  toc.classList.toggle("active");
+});
+toc.querySelector("nav").addEventListener("click", e => {
+  toc.classList.remove("active");
+});
+</script>
+</body>
+</html>

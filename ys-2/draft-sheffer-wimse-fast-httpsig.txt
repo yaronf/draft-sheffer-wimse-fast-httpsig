@@ -1,0 +1,766 @@
+
+
+
+
+Workload Identity in Multi System Environments                Y. Sheffer
+Internet-Draft                                               Independent
+Intended status: Standards Track                              J. Salowey
+Expires: 31 May 2027                                  Palo Alto Networks
+                                                        27 November 2026
+
+
+                 Fast HTTP Message Signatures for WIMSE
+                draft-sheffer-wimse-fast-httpsig-latest
+
+Abstract
+
+   The WIMSE HTTP Message Signatures profile authenticates each HTTP
+   request with a Workload Identity Token (WIT) and an asymmetric
+   signature.  Carrying and validating the WIT dominates that cost.
+   This document defines an optional extension that reduces that cost:
+   peers run a short handshake to establish shared MAC keys, then
+   authenticate later requests and responses between the same workloads
+   without the WIT.
+
+About This Document
+
+   This note is to be removed before publishing as an RFC.
+
+   The latest revision of this draft can be found at
+   https://yaronf.github.io/draft-sheffer-wimse-fast-httpsig/draft-
+   sheffer-wimse-fast-httpsig.html.  Status information for this
+   document may be found at https://datatracker.ietf.org/doc/draft-
+   sheffer-wimse-fast-httpsig/.
+
+   Discussion of this document takes place on the Workload Identity in
+   Multi System Environments Working Group mailing list
+   (mailto:wimse@ietf.org), which is archived at
+   https://mailarchive.ietf.org/arch/browse/wimse/.  Subscribe at
+   https://www.ietf.org/mailman/listinfo/wimse/.
+
+   Source for this draft and an issue tracker can be found at
+   https://github.com/yaronf/draft-sheffer-wimse-fast-httpsig.
+
+Status of This Memo
+
+   This Internet-Draft is submitted in full conformance with the
+   provisions of BCP 78 and BCP 79.
+
+   Internet-Drafts are working documents of the Internet Engineering
+   Task Force (IETF).  Note that other groups may also distribute
+   working documents as Internet-Drafts.  The list of current Internet-
+   Drafts is at https://datatracker.ietf.org/drafts/current/.
+
+   Internet-Drafts are draft documents valid for a maximum of six months
+   and may be updated, replaced, or obsoleted by other documents at any
+   time.  It is inappropriate to use Internet-Drafts as reference
+   material or to cite them other than as "work in progress."
+
+   This Internet-Draft will expire on 31 May 2027.
+
+Copyright Notice
+
+   Copyright (c) 2026 IETF Trust and the persons identified as the
+   document authors.  All rights reserved.
+
+   This document is subject to BCP 78 and the IETF Trust's Legal
+   Provisions Relating to IETF Documents (https://trustee.ietf.org/
+   license-info) in effect on the date of publication of this document.
+   Please review these documents carefully, as they describe your rights
+   and restrictions with respect to this document.  Code Components
+   extracted from this document must include Revised BSD License text as
+   described in Section 4.e of the Trust Legal Provisions and are
+   provided without warranty as described in the Revised BSD License.
+
+Table of Contents
+
+   1.  Introduction
+   2.  Conventions and Definitions
+   3.  Overview
+   4.  Handshake
+     4.1.  Key Establishment
+     4.2.  Suite Selection
+   5.  Key Export
+   6.  Session Messages
+   7.  Session Lifetime
+   8.  Tickets
+   9.  Negotiating the Extension
+   10. Examples
+   11. Security Considerations
+   12. IANA Considerations
+     12.1.  HTTP Signature Metadata Parameters
+       12.1.1.  wimse-kem-suite
+       12.1.2.  wimse-kem
+       12.1.3.  wimse-session-id
+       12.1.4.  wimse-ticket-client
+       12.1.5.  wimse-ticket-server
+   13. Open Issues
+   14. References
+     14.1.  Normative References
+     14.2.  Informative References
+   Appendix A.  Document History
+     A.1.  draft-sheffer-wimse-fast-httpsig-00
+   Acknowledgments
+   Authors' Addresses
+
+1.  Introduction
+
+   [I-D.ietf-wimse-http-signature] protects each HTTP message with a WIT
+   [I-D.ietf-wimse-workload-creds] and a signature under the private key
+   associated with the WIT.  The WIT is large relative to typical
+   service requests.  Asymmetric verification is secondary to that byte
+   and parsing cost.
+
+   This document defines an optional extension of that profile.  The
+   peers run one WIT-authenticated request/response exchange that also
+   performs an ephemeral key establishment.  Later messages in the same
+   session are authenticated with HTTP Message Signatures [RFC9421]
+   using hmac-sha256 and an HPKE-exported session identifier, optionally
+   with compact tickets.  The WIT is omitted from those messages.
+
+   Goals:
+
+   *  Amortize WIT carriage and asymmetric signature and verification
+      over many calls between the same workloads.
+
+   *  Extend the base profile; remain verifiable across TLS-terminating
+      intermediaries, as in the base profile.
+
+   *  Select a classical or post-quantum HPKE ciphersuite from the
+      client's WIT signature algorithm without changing the message
+      layout.
+
+2.  Conventions and Definitions
+
+   Terminology follows [I-D.ietf-wimse-arch] and
+   [I-D.ietf-wimse-http-signature].
+
+   The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT",
+   "SHOULD", "SHOULD NOT", "RECOMMENDED", "NOT RECOMMENDED", "MAY", and
+   "OPTIONAL" in this document are to be interpreted as described in
+   BCP 14 [RFC2119] [RFC8174] when, and only when, they appear in all
+   capitals, as shown here.
+
+3.  Overview
+
+   A session begins with one handshake request and its handshake
+   response, both signed under the base profile.  The peers run HPKE
+   [RFC9180] in Base mode and use only the Export interface: the client
+   is the HPKE recipient and sends an ephemeral recipient public key;
+   the server is the HPKE sender and returns the encapsulated key enc.
+   Both values are opaque wimse-kem byte sequences.  Both sides export
+   two MAC keys (one per direction) and a session identifier from the
+   HPKE context.  The server MAY issue an opaque ticket on the handshake
+   response.  The client MAY issue an opaque ticket on its first session
+   request, after key export; see Section 8.  The client confirms
+   possession of the exported keys by MACing its next request.  Further
+   requests and responses use hmac-sha256 and carry the session
+   identifier; when tickets were issued, they carry those ticket
+   parameters as well.  There is no session rehandshake: when the
+   session ends, the peers start a new handshake.  A pair of workloads
+   MAY hold concurrent sessions; the session identifier distinguishes
+   them.
+
+4.  Handshake
+
+   The handshake request and response MUST otherwise conform to
+   [I-D.ietf-wimse-http-signature], including WIT validation and the
+   wimse-workload-to-workload tag.  The handshake response MUST be
+   signed.  Clients that require this extension MUST include wimse-sign-
+   response on the handshake request.
+
+4.1.  Key Establishment
+
+   The handshake uses HPKE [RFC9180] in Base mode (Section 5.1.1 of
+   [RFC9180]) and obtains session secrets only through the Export
+   interface (Section 5.3 of [RFC9180]).
+
+   An HPKE ciphersuite is the triple (kem_id, kdf_id, aead_id) of two-
+   octet identifiers from [RFC9180] and [I-D.ietf-hpke-pq].  On the
+   wire, that triple is the six-octet sequence I2OSP(kem_id, 2) ||
+   I2OSP(kdf_id, 2) || I2OSP(aead_id, 2) (Section 4 of [RFC9180], big-
+   endian).
+
+   This document defines two ciphersuites.  Both use kdf_id = 0x0001
+   (HKDF-SHA256) and aead_id = 0xFFFF (Export-Only) (Section 7.3 of
+   [RFC9180]).
+
+   The classical ciphersuite is:
+
+   *  kem_id = 0x0010 (DHKEM(P-256, HKDF-SHA256)),
+
+   *  wire value 0x00 0x10 0x00 0x01 0xFF 0xFF.
+
+   The post-quantum ciphersuite is:
+
+   *  kem_id = 0x0041 (ML-KEM-768) [I-D.ietf-hpke-pq],
+
+   *  wire value 0x00 0x41 0x00 0x01 0xFF 0xFF.
+
+   Implementations MUST implement the classical ciphersuite.
+   Implementations of this extension that accept ML-DSA WIT algorithms
+   ([RFC9964]) MUST also implement the post-quantum ciphersuite.  Other
+   ciphersuites are not defined by this document; the parameters below
+   are designed so a later document can add them without changing
+   message layout.
+
+   Suite selection is specified in Section 4.2.
+
+   Both sides use the same HPKE info value:
+
+   info = "wimse-httpsig-session" || 0x00 ||
+          suite || 0x00 ||
+          req_nonce || 0x00 || resp_nonce || 0x00 ||
+          SHA-256(client_WIT) ||
+          SHA-256(server_WIT)
+
+   where:
+
+   *  suite is the six-octet ciphersuite value from wimse-kem-suite.
+
+   *  req_nonce / resp_nonce are the parsed handshake nonce values
+      (Section 2.3 of [RFC9421]) as UTF-8 octets and without the
+      surrounding quotes.
+
+   *  client_WIT / server_WIT are the handshake request and response
+      Workload-Identity-Token header field values (JWTs), as ASCII
+      octets.
+
+   *  SHA-256(...) denotes the 32-octet SHA-256 hash of those octets.
+
+   The server constructs info when creating the handshake response (it
+   chooses resp_nonce and knows both WIT values).  The client constructs
+   the same info after receiving that response.
+
+   The client is the HPKE recipient and the server is the HPKE sender:
+
+   *  The client runs GenerateKeyPair() and obtains a recipient key pair
+      (skR, pkR).
+
+   *  When generating the handshake response, the server runs
+      SetupBaseS(pkR, info), which returns (enc, context_S).
+
+   *  After receiving that response, the client runs SetupBaseR(enc,
+      skR, info) and obtains context_R.
+
+   *  Both sides export session secrets from their context as specified
+      in Section 5.
+
+   Public keys and enc are encoded as specified by the selected HPKE
+   KEM.  Peers MUST validate KEM public-key inputs as required by the
+   selected HPKE KEM before SetupBaseS or SetupBaseR.  For the classical
+   ciphersuite, that validation is Section 7.1.4 of [RFC9180].  For the
+   post-quantum ciphersuite, that validation is [I-D.ietf-hpke-pq].
+
+   The handshake request MUST include the signature parameters:
+
+   *  wimse-kem-suite: Byte Sequence; MUST be the six-octet wire value
+      of the ciphersuite selected in Section 4.2.
+
+   *  wimse-kem: Byte Sequence; the serialized recipient public key pkR.
+
+   The handshake request MUST NOT include wimse-ticket-client or wimse-
+   ticket-server.
+
+   The handshake response MUST include:
+
+   *  wimse-kem-suite: Byte Sequence; MUST equal the request's wimse-
+      kem-suite.
+
+   *  wimse-kem: Byte Sequence; enc from SetupBaseS(pkR, info).
+
+   The handshake response MAY also include wimse-ticket-server; see
+   Section 8.  The handshake response MUST NOT include wimse-ticket-
+   client.
+
+   Those parameters are covered by @signature-params as usual for
+   [RFC9421].  The private key associated with the WIT is used only to
+   sign.  It MUST NOT be used as an HPKE recipient key.
+
+4.2.  Suite Selection
+
+   The HTTP message signature algorithm on the handshake request is the
+   alg member of the cnf.jwk object in the client's WIT (Section 3.1 of
+   [I-D.ietf-wimse-http-signature]).  The client selects the HPKE
+   ciphersuite from that algorithm as follows:
+
+   *  If cnf.jwk.alg is ML-DSA-44, ML-DSA-65, or ML-DSA-87 [RFC9964],
+      the client MUST use the post-quantum ciphersuite.
+
+   *  Otherwise, for any other WIT signature algorithm allowed by
+      [I-D.ietf-wimse-workload-creds], the client MUST use the classical
+      ciphersuite.
+
+   The client MUST set wimse-kem-suite to the wire value of that
+   selected ciphersuite.  The server's WIT signature algorithm does not
+   change the selected ciphersuite.
+
+   A server that does not implement the requested ciphersuite MUST NOT
+   include wimse-kem-suite and wimse-kem as required for this extension
+   on the handshake response.  The client then treats the extension as
+   not negotiated (Section 9).
+
+5.  Key Export
+
+   Both sides export MAC keys and a session identifier from the HPKE
+   context established in Section 4:
+
+   OKM = Context.Export("session-keys", 80)
+   k_req = OKM[0..31]
+   k_res = OKM[32..63]
+   session_id = OKM[64..79]
+
+   where:
+
+   *  Context is context_S on the server and context_R on the client.
+
+   *  Context.Export is the HPKE secret export interface (Section 5.3 of
+      [RFC9180]) with exporter_context equal to the ASCII string
+      session-keys.
+
+   k_req MACs session requests. k_res MACs session responses. session_id
+   is the session identifier carried as wimse-session-id in Section 6.
+   Both peers compute it from the HPKE export; it is not sent on the
+   handshake.
+
+6.  Session Messages
+
+   After the handshake response, messages MAY use a session signature
+   instead of a WIT signature.
+
+   Session messages MUST NOT carry a Workload Identity Token or a
+   Workload-Identity-Token header.
+
+   A session signature on a request or response:
+
+   *  MUST use tag = wimse-httpsig-session.
+
+   *  MUST use the HTTP Message Signatures algorithm hmac-sha256.
+
+   *  MUST include wimse-session-id: Byte Sequence; the session_id value
+      exported in Section 5.
+
+   *  Ticket parameters follow Section 8: wimse-ticket-server when
+      established on the handshake response; wimse-ticket-client when
+      established on a prior or current session request.
+
+   *  MUST include the same signature parameters as the base profile for
+      requests or responses, as applicable; expires MUST NOT be after
+      the bound in Section 7.
+
+   *  MUST cover the same components as the base profile for requests or
+      responses, as applicable, except that Workload-Identity-Token is
+      not covered because it is absent.
+
+   *  MUST NOT be combined with a wimse-workload-to-workload signature
+      on the same message.
+
+   The sender MACs requests with k_req and responses with k_res.  The
+   recipient selects the session with wimse-session-id.  A client
+   replica MAY open wimse-ticket-client to obtain MAC keys; a server
+   replica MAY open wimse-ticket-server (see Section 8).  Otherwise the
+   recipient looks up MAC keys from local session state keyed by wimse-
+   session-id.  The recipient verifies accordingly.
+
+   Recipients recognize a WIMSE session signature solely by tag = wimse-
+   httpsig-session.  If more than one signature has that tag, the
+   recipient MUST reject the message.
+
+7.  Session Lifetime
+
+   Let session_exp be the earlier of the two handshake WIT exp values.
+   Peers MUST NOT use k_req or k_res after session_exp.  Senders MUST
+   NOT set expires after session_exp.  Recipients MUST reject a session
+   signature if expires is after session_exp, or if the current time is
+   after session_exp.  Comparisons against session_exp use the same
+   clock-skew policy the deployment applies when validating WIT exp
+   claims [I-D.ietf-wimse-workload-creds].
+
+   Per-message expires remains as in the base profile and is typically
+   much shorter. session_exp only caps how long handshake authority may
+   be reused as MAC keys.
+
+   This document does not define rehandshake inside a session.  Peers
+   that need a fresh session run a new handshake.  Each session has its
+   own session_id, key material, and, when issued, its own tickets.
+
+8.  Tickets
+
+   Tickets are optional per session and issuer-specific. wimse-session-
+   id identifies the session on the wire in Section 6; its value is
+   exported in Section 5.  A peer that keeps session keys in local (or
+   shared) state keyed by session_id MAY omit its ticket.  A ticket is
+   useful when a replica of that issuer must recover session keys
+   without that shared state.
+
+   This document defines two signature parameters, each an opaque Byte
+   Sequence:
+
+   *  wimse-ticket-client: issued by the client; only the client
+      deployment opens it.
+
+   *  wimse-ticket-server: issued by the server; only the server
+      deployment opens it.
+
+   Issuance happens only after the issuer can populate the ticket with
+   the exported MAC keys (Section 5) and session_exp (Section 7):
+
+   *  The server MAY include wimse-ticket-server on the handshake
+      response.
+
+   *  The client MUST NOT include wimse-ticket-client on the handshake
+      request.  The client MAY include wimse-ticket-client on a session
+      request after key export (typically the first session request).
+
+   *  Once wimse-ticket-server has been established, session requests
+      and responses MUST echo that same value and MUST NOT change it for
+      the rest of the session.
+
+   *  Once the client has sent wimse-ticket-client, later session
+      requests MUST echo that same value and MUST NOT change it for the
+      rest of the session.
+
+   *  A session response MUST echo wimse-ticket-client when the
+      corresponding request carried it, using that same value.
+      Concurrent requests may still be in flight without the ticket when
+      another request first establishes it; a response to a request that
+      omitted wimse-ticket-client MAY omit it.
+
+   *  Senders MUST NOT include a ticket parameter that has not been
+      established.
+
+   A peer that already has the keys from Section 5 (or from local
+   session state) need not open a ticket; it only echoes parameters it
+   must carry.
+
+   This document does not specify ticket format or how each deployment
+   manages ticket-opening keys.  Those keys are not shared across the
+   two deployments.  When a ticket carries session key material, the
+   issuer MUST protect that material with authenticated encryption, or
+   with equivalent confidentiality and integrity protection, under keys
+   known only to that deployment.
+
+   A ticket implementation needs enough data for a replica of the
+   issuing peer to obtain k_req and k_res and to enforce Section 7.  The
+   following content is RECOMMENDED inside the protected ticket
+   material:
+
+   *  session_id,
+
+   *  k_req and k_res (or equivalent key material),
+
+   *  client and server sub values,
+
+   *  wimse-aud,
+
+   *  session_exp.
+
+   A recipient that uses a ticket to obtain keys MUST reject it if the
+   ticket cannot be decoded or authenticated under current local policy.
+   If a session message carries wimse-session-id and an opened ticket
+   decodes to a different session_id, the recipient MUST reject the
+   message.
+
+9.  Negotiating the Extension
+
+   Unknown signature parameters do not by themselves fail [RFC9421]
+   verification, and [I-D.ietf-wimse-http-signature] does not require
+   rejecting them.  A base-profile-only server may therefore accept a
+   request that carries wimse-kem-suite and wimse-kem while ignoring
+   those parameters.
+
+   The client treats the extension as negotiated only if the handshake
+   response includes wimse-kem-suite and wimse-kem as required in
+   Section 4.  Otherwise the client MUST NOT use session signatures from
+   this exchange and continues with the base profile.
+
+10.  Examples
+
+   The following messages illustrate one handshake and the first session
+   exchange between the same peers.  The nonce values are illustrative
+   and do not meet the entropy requirement of the base profile.  Some
+   values are truncated for readability.
+
+   =============== NOTE: '\' line wrapping per RFC 8792 ================
+
+   GET /gimme-ice-cream?flavor=vanilla HTTP/1.1
+   Host: svcb.example.com
+   Signature: sig1=:JOn518Mhsejiz1cPgRTeZKBh9Bxz8sBCcgOFSsuVdP9HGhzMhXc\
+   ULvQKLibB1KWH8CzlDyjEcY7bT6ahzv8CDw==:
+   Signature-Input: sig1=("@method" "@path" "@query" "workload-identity\
+   -token");created=1795603147;expires=1795603447;nonce="fast1111";tag=\
+   "wimse-workload-to-workload";wimse-aud="https://svcb.example.com/gim\
+   me-ice-cream";wimse-sign-response;wimse-kem-suite=:ABAAAf//:;wimse-k\
+   em=:BNng0D1r4QDiAWMpfBv/eke12bfkhBfxm9BRPu92AMgO97ZA4/kP+bvRMvxraSf/\
+   dTuymVSnpKN5ji6UMe3QnSg=:
+   Workload-Identity-Token: eyJhbGciOiJFZDI1NTE5...-B1ORziWHAAw
+
+                        Figure 1: Handshake Request
+
+   =============== NOTE: '\' line wrapping per RFC 8792 ================
+
+   HTTP/1.1 404 Not Found
+   Content-Length: 20
+   Content-Digest: sha-256=:uJC3qmCc7n6/6w4N2I0vAfj1cd/hTOAhxLEYXmPbNno\
+   =:
+   Content-Type: text/plain
+   Signature: sig1=:hnHaKv7YNbiYEfMu2VwE2T6371K+Vi7FUmnnj/e5dbhPradNcv7\
+   ybQRCppmS1wZrom6lCWzWmfUV3t9RXbWKAA==:
+   Signature-Input: sig1=("@status" "workload-identity-token" "content-\
+   type" "content-digest" "@method";req "@path";req "@query";req);creat\
+   ed=1795603147;expires=1795603449;nonce="fast2222";tag="wimse-workloa\
+   d-to-workload";wimse-req-nonce="fast1111";wimse-kem-suite=:ABAAAf//:\
+   ;wimse-kem=:BHkeeUK2/Sg60GbqQ7oXriDu85CR49sYkPqRH7F+s4tTDruB0H648/hR\
+   abnMqVt9x2tPCa1R7/ktrmh3Ck4T3SM=:;wimse-ticket-server=:dGlja2V0...Gx\
+   wdHg==:
+   Workload-Identity-Token: eyJhbGciOiJFZDI1NTE5...EaAJDeFQ75CA
+
+   No ice cream today.
+
+                        Figure 2: Handshake Response
+
+   =============== NOTE: '\' line wrapping per RFC 8792 ================
+
+   GET /gimme-ice-cream?flavor=vanilla HTTP/1.1
+   Host: svcb.example.com
+   Signature: sig1=:BOzmD0gP96FOq1+qdZrAi5kurV5qXIzcvURse1G6DN4=:
+   Signature-Input: sig1=("@method" "@path" "@query");created=179560314\
+   7;expires=1795603447;nonce="fast3333";alg="hmac-sha256";tag="wimse-h\
+   ttpsig-session";wimse-aud="https://svcb.example.com/gimme-ice-cream"\
+   ;wimse-sign-response;wimse-session-id=:C1rrnxDm3kFUpk7AKgeNBQ==:;wim\
+   se-ticket-server=:dGlja2V0...GxwdHg==:;wimse-ticket-client=:dGlja2V0\
+   ...SktMTU4=:
+
+                         Figure 3: Session Request
+
+   =============== NOTE: '\' line wrapping per RFC 8792 ================
+
+   HTTP/1.1 404 Not Found
+   Content-Length: 20
+   Content-Digest: sha-256=:uJC3qmCc7n6/6w4N2I0vAfj1cd/hTOAhxLEYXmPbNno\
+   =:
+   Content-Type: text/plain
+   Signature: sig1=:Lu1VoaYruP5CIyRR+RQmoBrxBKULTQINw6JrWGoJksA=:
+   Signature-Input: sig1=("@status" "content-type" "content-digest" "@m\
+   ethod";req "@path";req "@query";req);created=1795603147;expires=1795\
+   603447;nonce="fast4444";alg="hmac-sha256";tag="wimse-httpsig-session\
+   ";wimse-req-nonce="fast3333";wimse-session-id=:C1rrnxDm3kFUpk7AKgeNB\
+   Q==:;wimse-ticket-server=:dGlja2V0...GxwdHg==:;wimse-ticket-client=:\
+   dGlja2V0...SktMTU4=:
+
+   No ice cream today.
+
+                         Figure 4: Session Response
+
+11.  Security Considerations
+
+   The base profile's considerations in [I-D.ietf-wimse-http-signature]
+   apply to the handshake.
+
+   An attacker that breaks the HPKE KEM for a recorded handshake can
+   forge session MACs until session_exp; see Section 7.  With the
+   classical ciphersuite, a future quantum attacker that breaks DHKEM
+   can forge those MACs.  With the post-quantum ciphersuite, the
+   exported MAC keys resist that class of attack on the KEM.
+   Authentication of the handshake itself remains the WIT signature
+   algorithms allowed by [I-D.ietf-wimse-workload-creds].  Handshake
+   authentication is post-quantum only when those algorithms are (ML-
+   DSA-44, ML-DSA-65, or ML-DSA-87).  Selecting the post-quantum HPKE
+   ciphersuite for a classical WIT algorithm is not defined; see
+   Section 4.2.
+
+   HPKE export secrets are determined by the HPKE context.  A replayed
+   enc with the same info yields the same exported keys (Section 5.3 of
+   [RFC9180]).  The WIT-signed handshake and its nonce values bind that
+   context to a single authenticated exchange; session-message nonce
+   values still apply as in the base profile.
+
+   The first session request is the client's key-confirmation message.
+   A peer that sees only the handshake response may not hold k_req.
+
+   Separate ticket issuers confine minting: an opening key for one
+   deployment does not open the other deployment's tickets.  Whoever can
+   mint tickets for a deployment can forge session MACs that its
+   replicas accept after opening the ticket.
+
+   A recommended ticket carries both k_req and k_res.  An attacker who
+   opens a captured ticket recovers both MAC keys and can forge to
+   either peer, including one that uses ordinary session state.
+   Retained old opening keys keep previously issued tickets openable,
+   which defeats forward secrecy for the enclosed MAC keys until
+   session_exp.  Rotate opening keys at least as often as the maximum
+   WIT lifetime the deployment accepts, and minimize retention of old
+   keys.
+
+   Session messages omit the WIT.  Revocation or status checks that
+   require the WIT apply at handshake time only.  After that, authority
+   to speak in the session is carried by the MAC keys and wimse-session-
+   id until session_exp; see Section 7.
+
+   session_id is taken from the same Export output as the MAC keys but
+   is carried in cleartext.  It identifies the session; it is not a
+   secret authenticator.  Possession of session_id alone does not allow
+   forging session MACs.
+
+   Replay of session messages is unchanged from the base profile: nonce
+   and optional replay caches help, and caches that are not shared
+   across replicas leave cross-replica replay possible.
+
+   TLS-terminating intermediaries see wimse-session-id, ticket
+   parameters (when present), and MAC values in cleartext.  With the
+   ticket protection required in Section 8, they see ciphertext rather
+   than k_req and k_res.  They cannot alter covered components without
+   failing verification.  They can attempt capture-and-replay within
+   expires.
+
+12.  IANA Considerations
+
+12.1.  HTTP Signature Metadata Parameters
+
+   IANA is requested to register the following entries in the "HTTP
+   Signature Metadata Parameters" registry
+   [IANA.HTTP.MESSAGE.SIGNATURE], per Section 6.3.1 of [RFC9421]:
+
+12.1.1.  wimse-kem-suite
+
+   *  Name: wimse-kem-suite
+
+   *  Description: Byte Sequence; HPKE ciphersuite kem_id || kdf_id ||
+      aead_id for a WIMSE fast HTTP signature handshake.
+
+   *  Reference: RFC XXX, Section 4.
+
+12.1.2.  wimse-kem
+
+   *  Name: wimse-kem
+
+   *  Description: Byte Sequence; HPKE recipient public key on the
+      handshake request, or HPKE enc on the handshake response.
+
+   *  Reference: RFC XXX, Section 4.
+
+12.1.3.  wimse-session-id
+
+   *  Name: wimse-session-id
+
+   *  Description: Byte Sequence; HPKE-exported session identifier for
+      WIMSE fast HTTP signature session messages.
+
+   *  Reference: RFC XXX, Section 5, Section 6.
+
+12.1.4.  wimse-ticket-client
+
+   *  Name: wimse-ticket-client
+
+   *  Description: Byte Sequence; optional opaque client-issued session
+      ticket for WIMSE fast HTTP signature session messages (issued
+      after key export).
+
+   *  Reference: RFC XXX, Section 8.
+
+12.1.5.  wimse-ticket-server
+
+   *  Name: wimse-ticket-server
+
+   *  Description: Byte Sequence; optional opaque server-issued session
+      ticket for WIMSE fast HTTP signature handshake responses and
+      session messages.
+
+   *  Reference: RFC XXX, Section 8.
+
+13.  Open Issues
+
+   *  Error responses when the ticket is rejected and when session MAC
+      verification fails.
+
+   *  Whether a session needs an explicit cleanup hint so peers can drop
+      ticket and MAC state before session_exp (see Section 7), rather
+      than waiting for that bound alone.
+
+14.  References
+
+14.1.  Normative References
+
+   [I-D.ietf-hpke-pq]
+              Barnes, R. and D. Connolly, "Post-Quantum and Post-
+              Quantum/Traditional Hybrid Algorithms for HPKE", Work in
+              Progress, Internet-Draft, draft-ietf-hpke-pq-05, 6 July
+              2026, <https://datatracker.ietf.org/doc/html/draft-ietf-
+              hpke-pq-05>.
+
+   [I-D.ietf-wimse-http-signature]
+              Salowey, J. A. and Y. Sheffer, "WIMSE Workload-to-Workload
+              Authentication with HTTP Signatures", Work in Progress,
+              Internet-Draft, draft-ietf-wimse-http-signature-09, 20
+              November 2026, <https://datatracker.ietf.org/doc/html/
+              draft-ietf-wimse-http-signature-09>.
+
+   [I-D.ietf-wimse-workload-creds]
+              Campbell, B., Salowey, J. A., Schwenkschuster, A.,
+              Sheffer, Y., and Y. Rosomakho, "WIMSE Workload
+              Credentials", Work in Progress, Internet-Draft, draft-
+              ietf-wimse-workload-creds-03, 30 October 2026,
+              <https://datatracker.ietf.org/doc/html/draft-ietf-wimse-
+              workload-creds-03>.
+
+   [RFC2119]  Bradner, S., "Key words for use in RFCs to Indicate
+              Requirement Levels", BCP 14, RFC 2119,
+              DOI 10.17487/RFC2119, March 1997,
+              <https://www.rfc-editor.org/rfc/rfc2119>.
+
+   [RFC8174]  Leiba, B., "Ambiguity of Uppercase vs Lowercase in RFC
+              2119 Key Words", BCP 14, RFC 8174, DOI 10.17487/RFC8174,
+              May 2017, <https://www.rfc-editor.org/rfc/rfc8174>.
+
+   [RFC9180]  Barnes, R., Bhargavan, K., Lipp, B., and C. Wood, "Hybrid
+              Public Key Encryption", RFC 9180, DOI 10.17487/RFC9180,
+              February 2022, <https://www.rfc-editor.org/rfc/rfc9180>.
+
+   [RFC9421]  Backman, A., Ed., Richer, J., Ed., and M. Sporny, "HTTP
+              Message Signatures", RFC 9421, DOI 10.17487/RFC9421,
+              February 2024, <https://www.rfc-editor.org/rfc/rfc9421>.
+
+   [RFC9964]  Prorock, M. and O. Steele, "ML-DSA for JSON Object Signing
+              and Encryption (JOSE) and CBOR Object Signing and
+              Encryption (COSE)", RFC 9964, DOI 10.17487/RFC9964, May
+              2026, <https://www.rfc-editor.org/rfc/rfc9964>.
+
+14.2.  Informative References
+
+   [I-D.ietf-wimse-arch]
+              Salowey, J. A., Rosomakho, Y., and H. Tschofenig,
+              "Workload Identity in a Multi System Environment (WIMSE)
+              Architecture", Work in Progress, Internet-Draft, draft-
+              ietf-wimse-arch-09, 16 November 2026,
+              <https://datatracker.ietf.org/doc/html/draft-ietf-wimse-
+              arch-09>.
+
+   [IANA.HTTP.MESSAGE.SIGNATURE]
+              "HTTP Message Signature", n.d.,
+              <https://www.iana.org/assignments/http-message-signature/
+              http-message-signature.xhtml#signature-metadata-
+              parameters>.
+
+Appendix A.  Document History
+
+
+   // RFC Editor: please remove before publication.
+
+A.1.  draft-sheffer-wimse-fast-httpsig-00
+
+   *  Initial version.
+
+Acknowledgments
+
+   TODO.
+
+Authors' Addresses
+
+   Yaron Sheffer
+   Independent
+   Email: yaronf.ietf@gmail.com
+
+
+   Joe Salowey
+   Palo Alto Networks
+   Email: joe@salowey.net
